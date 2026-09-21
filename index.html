@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procesador Extracto MP · Argentina</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF5023'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    /* paleta oficial Fudo */
+    --naranja:#FF5023; --naranja-osc:#E5401A; --naranja-suave:#FFC9BB; --naranja-tenue:#FFEEE9;
+    --indigo:#3938A0; --indigo-medio:#5F5FC4; --lavanda:#E1E1F5;
+    --navy:#071D37;
+    --ink:#3B3B3B; --muted:#7A7A80; --gris:#C6C6C6;
+    --bg:#FBF7F5; --panel:#ffffff; --line:#EFE6E2;
+    --ok:#0F7B4F; --ok-suave:#E6F4ED;
+    --warn:#8A5A00; --warn-suave:#FDF3E0;
+    --bad:#A11B10; --bad-suave:#FCE9E6;
+    --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:400 14px/1.55 var(--sans)}
+
+  /* ---- banda superior, como la portada del template ---- */
+  .banda{background:var(--naranja);color:#fff;padding:26px 0 24px}
+  .banda .wrap{padding-top:0;padding-bottom:0}
+  .banda h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.02em}
+  .banda .sub{color:var(--naranja-suave);font-size:13.5px;font-weight:500;margin-top:2px}
+  .banda p{margin:12px 0 0;max-width:760px;color:#fff;opacity:.95;font-size:14px}
+  .banda b{font-weight:600}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 72px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:16px;
+    box-shadow:0 1px 2px rgba(7,29,55,.04)}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--naranja);font-weight:700;margin:0 0 14px}
+  .sub{color:var(--muted);font-size:13px}
+
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .drop{border:1.5px dashed var(--naranja-suave);border-radius:var(--radius);padding:14px;background:var(--naranja-tenue);
+    cursor:pointer;transition:.15s}
+  .drop:hover,.drop.over{border-color:var(--naranja);background:#FFE3DB}
+  .drop.ok{border-style:solid;border-color:var(--indigo-medio);background:var(--lavanda)}
+  .drop .t{font-weight:600;font-size:13.5px}
+  .drop .d{color:var(--muted);font-size:12px;margin-top:3px}
+  .drop .f{font-size:12px;margin-top:7px;font-family:var(--mono);word-break:break-all}
+  .drop input{display:none}
+
+  .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  label.fld{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
+  input[type=date],input[type=text]{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;background:#fff;color:var(--ink)}
+  input[type=date]:focus,input[type=text]:focus{outline:2px solid var(--naranja-suave);outline-offset:1px;border-color:var(--naranja)}
+  button{border:0;border-radius:99px;padding:10px 20px;font:600 14px/1 var(--sans);cursor:pointer;
+    background:var(--naranja);color:#fff;transition:.15s}
+  button:hover{background:var(--naranja-osc)}
+  button:disabled{background:var(--gris);cursor:not-allowed}
+  button.sec{background:var(--lavanda);color:var(--indigo)}
+  button.sec:hover{background:#D2D2F0}
+
+  .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .kpi{background:var(--naranja-tenue);border:1px solid #FCE0D8;border-radius:10px;padding:12px 14px}
+  .kpi .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .kpi .v{font-size:19px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;color:var(--naranja)}
+
+  .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600}
+  .pill.ok{background:var(--ok-suave);color:var(--ok)}
+  .pill.warn{background:var(--warn-suave);color:var(--warn)}
+  .pill.bad{background:var(--bad-suave);color:var(--bad)}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--indigo);font-weight:700;
+    position:sticky;top:0;background:var(--lavanda)}
+  tbody tr:hover{background:var(--naranja-tenue)}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  #tabla td:first-child{white-space:nowrap}
+  .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  tfoot td{position:sticky;bottom:0;background:var(--naranja-tenue);border-top:2px solid var(--naranja);
+    font-variant-numeric:tabular-nums}
+
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tabs button{background:var(--lavanda);color:var(--indigo);font-weight:600;padding:7px 14px;font-size:13px}
+  .tabs button:hover{background:#D2D2F0}
+  .tabs button.on{background:var(--indigo);color:#fff}
+  .tabs button.on:hover{background:var(--indigo)}
+
+  .aviso{padding:10px 13px;border-radius:9px;margin-bottom:7px;font-size:13px;border-left:4px solid transparent}
+  .aviso.warn{background:var(--warn-suave);color:var(--warn);border-left-color:#D9A128}
+  .aviso.bad{background:var(--bad-suave);color:var(--bad);border-left-color:var(--bad)}
+  .aviso b{font-family:var(--mono);font-weight:600}
+
+  .hint{color:var(--muted);font-size:12.5px;margin-top:10px}
+  .muted{color:var(--muted)}
+  .hidden{display:none!important}
+  .fix input{width:120px;font-family:var(--mono);font-size:12px;padding:5px 7px}
+
+  /* ---- instructivo ---- */
+  #cReglas details{border-top:1px solid var(--line)}
+  #cReglas details:last-of-type{border-bottom:1px solid var(--line)}
+  #cReglas summary{
+    cursor:pointer;padding:11px 2px;font-weight:600;font-size:14.5px;list-style:none;
+    display:flex;align-items:center;gap:9px
+  }
+  #cReglas summary::-webkit-details-marker{display:none}
+  #cReglas summary::before{
+    content:"+";font-family:var(--mono);color:var(--naranja);font-weight:700;width:12px;flex:none
+  }
+  #cReglas details[open] summary::before{content:"–"}
+  #cReglas summary:hover{color:var(--naranja)}
+  #cReglas .rc{padding:2px 0 16px 21px}
+  #cReglas .rc p,#cReglas .rc ul,#cReglas .rc ol{max-width:78ch}
+  #cReglas .rc p{margin:0 0 10px;font-size:13.5px;line-height:1.6}
+  #cReglas .rc ul,#cReglas .rc ol{margin:0 0 10px;padding-left:18px;font-size:13.5px;line-height:1.6}
+  #cReglas .rc li{margin-bottom:5px}
+  #cReglas .rc code{
+    font-family:var(--mono);font-size:12px;background:var(--lavanda);color:var(--indigo);
+    padding:1px 5px;border-radius:4px
+  }
+  #cReglas .nota-r{
+    border-left:3px solid var(--naranja);background:var(--naranja-tenue);
+    padding:9px 13px;border-radius:0 7px 7px 0;margin:12px 0 0!important
+  }
+  #cReglas table.rt{margin:4px 0 10px;font-size:13px;width:100%;max-width:960px}
+  #cReglas table.rt th{background:var(--lavanda);white-space:nowrap}
+  #cReglas table.rt td{padding:7px 10px}
+  #cReglas table.rt td:first-child{font-weight:600;white-space:nowrap}
+  footer{margin-top:30px;color:var(--muted);font-size:12px;text-align:center}
+  @media (max-width:560px){
+    .wrap{padding:18px 16px 48px}
+    .banda{padding:20px 0 18px}
+    .banda h1{font-size:21px}
+  }
+</style>
+</head>
+<body>
+
+<div class="banda">
+  <div class="wrap">
+    <h1>Procesador de Extracto · Mercado Pago Argentina</h1>
+    <div class="sub">Comandarina SRL</div>
+    <p>Cruza el reporte de <b>movimientos (balance)</b> con el de <b>todas las transacciones</b>,
+       identifica cada movimiento y arma el extracto listo para conciliar y facturar.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ 1. ARCHIVOS ============ -->
+  <div class="card">
+    <h2>Archivos</h2>
+    <div class="grid">
+      <label class="drop" id="d-mov">
+        <div class="t">Movimientos (balance)</div>
+        <div class="d">MP → Balance → Liberado. <span class="muted">…_movements_….xlsx</span></div>
+        <div class="f muted">Arrastrá o hacé clic</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-k="mov">
+      </label>
+      <label class="drop" id="d-tx">
+        <div class="t">Todas las transacciones</div>
+        <div class="d">MP → Informes → Transacciones. <span class="muted">transaccionesMPARG….xlsx</span></div>
+        <div class="f muted">Arrastrá o hacé clic</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-k="tx">
+      </label>
+      <label class="drop" id="d-acc">
+        <div class="t">Cuentas de Dash</div>
+        <div class="d">Reporte <i>accounts</i>. Acepta el .zip tal cual lo bajás.</div>
+        <div class="f muted">Arrastrá o hacé clic</div>
+        <input type="file" accept=".csv,.zip,.xlsx" data-k="acc">
+      </label>
+      <label class="drop" id="d-odoo">
+        <div class="t">Contactos de Odoo</div>
+        <div class="d">Export res.partner con Referencia, ID, NIF y responsabilidad AFIP.</div>
+        <div class="f muted">Arrastrá o hacé clic</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-k="odoo">
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <div><label class="fld">Desde</label><input type="date" id="desde"></div>
+      <div><label class="fld">Hasta</label><input type="date" id="hasta"></div>
+      <div><label class="fld">Línea de comisión</label><input type="text" id="etiquetaCom" placeholder="Com Septiembre 2026" size="18"></div>
+      <div><label class="fld">Precio terminal</label><input type="text" id="precioTerminal" value="79900" size="8"></div>
+
+      <button id="btn" disabled>Procesar</button>
+      <button class="sec" id="btnLimpiar">Limpiar</button>
+      <span id="estado" class="muted"></span>
+    </div>
+    <div class="hint">Los archivos se leen en tu navegador. No se sube nada a ningún servidor.</div>
+  </div>
+
+  <!-- ============ 2. RESULTADO ============ -->
+  <div class="card hidden" id="cRes">
+    <h2>Control del período</h2>
+    <div class="kpis" id="kpis"></div>
+    <div id="cuadre" style="margin-top:14px"></div>
+  </div>
+
+  <!-- ============ 3. PENDIENTES ============ -->
+  <div class="card hidden" id="cPend">
+    <h2>Pendientes de identificar</h2>
+    <p class="sub" style="margin:-6px 0 12px">
+      Estas filas no se pueden resolver con los archivos (cuentas renombradas en Dash, terminales con
+      identificador raro). Cargá el ID de Dash y la herramienta lo recuerda para las próximas corridas.
+    </p>
+    <div id="pendientes"></div>
+
+    <div id="cSinId" class="hidden" style="margin-top:22px">
+      <h2 style="margin-bottom:6px">Movimientos sin identificar</h2>
+      <p class="sub" style="margin:0 0 12px">
+        Mercado Pago no manda descripción para estos. Escribí de qué son y se aplican al extracto.
+        Los <b>pagos</b> dependen de lo que figure en MP en cada movimiento, así que se usan en esta corrida
+        y no se guardan; el resto queda recordado para las próximas.
+      </p>
+      <div id="sinIdentificar"></div>
+    </div>
+
+    <div id="avisoPersistencia" class="hint hidden"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnAplicar">Aplicar y recalcular</button>
+      <button class="sec" id="btnExpAlias">Exportar diccionario</button>
+      <label class="sec" style="border-radius:8px;padding:9px 16px;background:#eef0f4;cursor:pointer;font-weight:600">
+        Importar diccionario<input type="file" id="impAlias" accept=".json" style="display:none">
+      </label>
+    </div>
+  </div>
+
+  <!-- ============ 4. AVISOS ============ -->
+  <div class="card hidden" id="cAvisos">
+    <h2>Avisos</h2>
+    <div id="avisos"></div>
+  </div>
+
+  <!-- ============ 5. DETALLE ============ -->
+  <div class="card hidden" id="cTabs">
+    <h2>Detalle</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="scroll"><table id="tabla"></table></div>
+    <div class="row" style="margin-top:14px">
+      <button id="btnXlsx">Descargar Excel</button>
+      <span class="muted" id="nombreArchivo"></span>
+    </div>
+  </div>
+
+
+  <!-- ============ REGLAS ============ -->
+  <div class="card" id="cReglas">
+    <h2>Reglas del extracto</h2>
+    <p class="sub" style="margin:-6px 0 14px">El criterio que aplica esta herramienta, para consultar sin salir de acá.</p>
+
+    <details>
+      <summary>Los cuatro archivos</summary>
+      <div class="rc">
+        <p><b>Movimientos</b> (balance liberado de MP) es la base: cada línea de plata que entra o sale.
+           <b>Transacciones</b> (todas las transacciones de MP) dice qué era cada cobro, cruzando por el ID de operación.
+           <b>Cuentas de Dash</b> resuelve el ID de la cuenta. <b>Contactos de Odoo</b> aporta contacto, razón social y
+           condición frente al impuesto.</p>
+        <p class="nota-r">Los dos reportes de MP tienen que ser del mismo período. Si el de transacciones queda corto,
+           los cobros salen sin identificar y la herramienta te avisa cuántos.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>El orden del proceso</summary>
+      <div class="rc">
+        <ol>
+          <li><b>Recortar el período</b> por la fecha del movimiento.</li>
+          <li><b>Netear por ID de pago</b>: cobro, devolución total o parcial, contracargo y anulación de contracargo del
+              mismo ID se suman entre sí. Si el neto da cero se eliminan todas esas filas; si no, queda una sola fila con el neto.</li>
+          <li><b>Identificar cada cobro</b> buscando su transacción y mirando el identificador y el detalle de la venta.</li>
+          <li><b>Resolver la cuenta</b>: identificador → ID de Dash → referencia en Odoo.</li>
+          <li><b>Agrupar</b> impuestos y comisión en una línea cada uno, al pie, con la fecha del último día.</li>
+          <li><b>Repartir en hojas</b>: Extracto MP, y de ahí Saas y Terminales.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>Qué entra y qué va a otro diario</summary>
+      <div class="rc">
+        <table class="rt">
+          <thead><tr><th>Concepto</th><th>Se reconoce por</th><th>Destino</th></tr></thead>
+          <tbody>
+            <tr><td>Suscripción o abono</td><td><code>dash::factura::n</code> o <code>usuario@cuenta</code> con "Abono mensual"</td><td>Extracto · Saas</td></tr>
+            <tr><td>Venta SmartPos</td><td>El identificador o el detalle empieza con <code>TFP:</code></td><td>Extracto · Terminales</td></tr>
+            <tr><td>Venta de hardware</td><td>El detalle menciona hardware</td><td>Extracto · Hardware</td></tr>
+            <tr><td>Tu delivery</td><td>"Suscripción Tu delivery - Fudo" o <code>::fee_payment</code></td><td>Otro diario</td></tr>
+            <tr><td>Deuda por comisiones</td><td>El detalle dice "Deuda por comisiones"</td><td>Otro diario</td></tr>
+            <tr><td>Comisión de terceros</td><td>"Comisión por uso de plataforma de terceros", <code>FUDO-…</code></td><td>Otro diario</td></tr>
+            <tr><td>Sin identificación</td><td>La transacción no trae identificador</td><td>Extracto, sin descripción</td></tr>
+          </tbody>
+        </table>
+        <p class="nota-r">Manda el concepto, no el tipo de movimiento: un contracargo de una suscripción queda dentro
+           del extracto y uno de Tu delivery se va con Tu delivery. Lo mismo con las anulaciones de contracargo.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Movimientos que no son cobros</summary>
+      <div class="rc">
+        <table class="rt">
+          <thead><tr><th>Movimiento</th><th>Cómo queda</th></tr></thead>
+          <tbody>
+            <tr><td>Rendimiento positivo de la inversión</td><td>Una fila por movimiento, con esa misma descripción</td></tr>
+            <tr><td>Retiro de dinero</td><td>"Transf. MP a BBVA", con aviso por si es un pago a un proveedor</td></tr>
+            <tr><td>Pago</td><td>Fila sin descripción: se identifica a mano en Mercado Pago</td></tr>
+            <tr><td>Tipo no reconocido</td><td>Entra igual, con el nombre del tipo, y queda avisado</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Las cinco líneas del pie</summary>
+      <div class="rc">
+        <p>Todas con la fecha del último día del período, y cada una suma su concepto junto con sus anulaciones:
+           <b>Ret. SIRTAC</b>, <b>Imp. Ley Créditos y Débitos</b>, <b>Ret. IIBB CABA</b>,
+           <b>Ret. IIBB Otras Jurisdicciones</b> (el resto de las provincias) y <b>Com <i>Mes Año</i></b>.</p>
+        <p class="nota-r">Las cinco líneas del pie suman <b>todo el período</b>, también lo que corresponde a
+           cobros de Tu delivery y de deuda por comisiones: impuestos, retenciones y costo de Mercado Pago
+           quedan siempre en este extracto. Al extracto de la tienda online se va únicamente el total de lo que
+           pagó el cliente. La línea de comisión suma el costo y sus anulaciones, totales y parciales; el mes de
+           la etiqueta se edita arriba.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Cómo se nombra cada fila</summary>
+      <div class="rc">
+        <p>La descripción sale del <b>nombre del contacto en Odoo</b>, o sea la razón social, no del nombre de la cuenta
+           en Dash. Si la cuenta no está en Odoo queda el nombre de Dash, y si tampoco, el usuario del identificador.</p>
+        <table class="rt">
+          <thead><tr><th>Fila</th><th>Descripción</th><th>Tipo y contacto</th></tr></thead>
+          <tbody>
+            <tr><td>Cobro de suscripción</td><td>La razón social</td><td>Cobro, con contacto</td></tr>
+            <tr><td>Venta SmartPos</td><td>"Venta SmartPos - " y el nombre de la cuenta</td><td>Cobro, con contacto</td></tr>
+            <tr><td>Venta de hardware</td><td>"Venta de Hardware", sin cuenta</td><td>Cobro, sin contacto</td></tr>
+            <tr><td>Devolución</td><td>"Devolución de cobro - " y la cuenta</td><td>Sin tipo y sin contacto</td></tr>
+            <tr><td>Devolución de terminal</td><td>"Venta SmartPos - Devolución de cobro - Terminal - " y la terminal</td><td>Sin tipo y sin contacto</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>El cuadro de terminales</summary>
+      <div class="rc">
+        <p>Los tres tramos del identificador TFP son pares de <b>cantidad y descuento</b>, y el precio de lista es 79.900.
+           Con <code>TFP:123456:1;75:4;50:10;0:16:Nombre del local</code>: 1 al 75 % son 19.975, 4 al 50 % son 159.800 y 10 sin
+           descuento son 799.000 — total 978.775, que es lo cobrado.</p>
+        <table class="rt">
+          <thead><tr><th>Columna</th><th>Cómo se calcula</th><th>En el ejemplo</th></tr></thead>
+          <tbody>
+            <tr><td>LINEA</td><td>Cuántos descuentos distintos hay</td><td>3</td></tr>
+            <tr><td>DESCUENTO</td><td>Los descuentos distintos, unidos con " Y "</td><td>75 Y 50 Y 0</td></tr>
+            <tr><td>Q TERMINALES</td><td>La suma de las cantidades</td><td>15</td></tr>
+            <tr><td>CONTROL</td><td>El teórico menos lo cobrado, tiene que dar cero</td><td>0</td></tr>
+          </tbody>
+        </table>
+        <p class="nota-r">En una devolución el importe viene en negativo, así que CONTROL queda vacía.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Las hojas y los tres controles</summary>
+      <div class="rc">
+        <p><b>Extracto MP</b> es lo que se sube a Odoo; <b>Saas</b> son los cobros identificados que no son venta SmartPos;
+           <b>Terminales</b>, las ventas SmartPos con su cuadro; <b>Hardware</b>, las ventas de hardware, que se facturan
+           aparte; en las dos, los saldos negativos quedan afuera porque se usan para facturar, pero sí están
+           en el Extracto MP; <b>Control</b>, el cuadre y los avisos. El detalle de deuda
+           por comisiones y Tu delivery se ve acá pero no baja en el Excel: en Control quedan sus totales.</p>
+        <ul>
+          <li><b>El cuadre</b>: extracto + lo que va a otro diario + comisión de terceros = total de movimientos del período.</li>
+          <li><b>IDs de pago repetidos</b>: no puede quedar ninguno duplicado en Operación Relacionada.</li>
+          <li><b>Pendientes de identificar</b>: las cuentas que no se resuelven con los archivos.</li>
+          <li><b>Movimientos sin identificar</b>: los que Mercado Pago manda sin descripción. Los nombrás
+              ahí mismo; los pagos valen sólo para esa corrida y el resto queda recordado.</li>
+        </ul>
+        <p>El pie de cada solapa muestra la suma y la cantidad de filas de esa hoja. En el Excel no va ninguna
+           fila de total: las hojas bajan sólo con datos, para poder importarlas y filtrarlas.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Lo que no se resuelve solo</summary>
+      <div class="rc">
+        <ul>
+          <li><b>Cuentas renombradas en Dash</b>: el identificador trae el usuario viejo y ya no coincide con ningún nombre.</li>
+          <li><b>Terminales con identificador raro</b>: el segundo tramo a veces es un ID de Mercado Pago y no el de Dash.</li>
+          <li><b>Contactos duplicados en Odoo</b>: se toma el de ID más bajo, que es el original, y queda avisado.</li>
+          <li><b>Retiros de dinero</b>: la transferencia a BBVA y un pago a proveedor salen por el mismo tipo de movimiento.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <footer>Hecho para el proceso de conciliación y facturación de Mercado Pago Argentina.</footer>
+</div>
+
+<script>/* ===========================================================================
+   Núcleo de procesamiento — Extracto Mercado Pago Argentina (Fudo / Comandarina)
+   Se usa igual desde el navegador (herramienta HTML) y desde Node (tests).
+   =========================================================================== */
+(function (root) {
+  'use strict';
+
+  // ---------- helpers ----------
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function num(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim().replace(/\s/g, '');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+  function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function txt(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+  // MP manda el detalle de venta con comillas escapadas al estilo CSV:
+  //   '"""Terminal Fudo - Local"" + 2 Item adicional"' -> 'Terminal Fudo - Local + 2 Item adicional'
+  function limpiaComillas(v) {
+    let s = txt(v);
+    if (!s.startsWith('"')) return s;
+    while (s.length > 1 && s.startsWith('"') && s.endsWith('"')) {
+      s = s.slice(1, -1).replace(/""/g, '"').trim();
+    }
+    return s.replace(/"/g, '').trim();
+  }
+  // fecha (UTC) de '2026-09-08T00:19:18Z' -> '2026-09-08'
+  function fechaDe(v) {
+    if (v instanceof Date) {
+      return v.toISOString().slice(0, 10);
+    }
+    const s = txt(v);
+    const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[0];
+    const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+    return s.slice(0, 10);
+  }
+  function norm(s) {
+    return txt(s).toLowerCase().replace(/[^a-z0-9ñáéíóúü]/g, '');
+  }
+
+
+  // ---------- lectura tolerante de columnas ----------
+  // Los reportes cambian tildes, mayúsculas y espacios entre descargas, así que
+  // las columnas se buscan por nombre normalizado y no por el texto exacto.
+  function normClave(k) {
+    return String(k).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]/g, '');
+  }
+  function mapearColumnas(filas, canonicos) {
+    const out = {};
+    if (!filas || !filas.length) return out;
+    const indice = new Map();
+    for (const fila of filas.slice(0, 5)) {
+      for (const k of Object.keys(fila)) if (!indice.has(normClave(k))) indice.set(normClave(k), k);
+    }
+    for (const campo in canonicos) {
+      for (const alias of canonicos[campo]) {
+        const real = indice.get(normClave(alias));
+        if (real) { out[campo] = real; break; }
+      }
+    }
+    return out;
+  }
+  const COLS_MOV = {
+    fecha: ['Fecha de Pago', 'Fecha', 'Date'],
+    tipo: ['Tipo de Operación', 'Tipo de Operacion', 'Descripción', 'Description'],
+    nro: ['Número de Movimiento', 'Numero de Movimiento'],
+    op: ['Operación Relacionada', 'Operacion Relacionada', 'Operación relacionada'],
+    importe: ['Importe', 'Monto', 'Amount']
+  };
+  const COLS_TX = {
+    op: ['ID DE OPERACIÓN EN MERCADO PAGO', 'ID DE OPERACION EN MERCADO PAGO', 'OPERATION ID'],
+    ident: ['NÚMERO DE IDENTIFICACIÓN', 'NUMERO DE IDENTIFICACION', 'EXTERNAL REFERENCE'],
+    detalle: ['DETALLE DE LA VENTA', 'DETALLE DE VENTA', 'DESCRIPTION'],
+    extra: ['DATOS EXTRA'],
+    medio: ['TIPO DE MEDIO DE PAGO'],
+    comision: ['COMISIONES + IVA', 'COMISIONES IVA'],
+    neto: ['MONTO NETO DE LA OPERACIÓN', 'MONTO NETO DE LA OPERACION'],
+    fecha: ['FECHA DE APROBACIÓN', 'FECHA DE APROBACION', 'FECHA DE ORIGEN']
+  };
+
+  // ---------- diccionario de tipos de movimiento ----------
+  const AGREGADOS = [
+    { clave: 'sirtac',   etiqueta: 'Ret. SIRTAC',
+      test: t => /R[ée]gimen SIRTAC/i.test(t) },
+    { clave: 'debcred',  etiqueta: 'Imp. Ley Créditos y Débitos',
+      test: t => /Cr[ée]ditos y D[ée]bitos/i.test(t) },
+    { clave: 'iibb_otras', etiqueta: 'Ret. IIBB Otras Jurisdicciones',
+      test: t => /Ingresos Brutos por falta de alta|Impuesto a los IIBB de/i.test(t) },
+    { clave: 'iibb_caba', etiqueta: 'Ret. IIBB CABA',
+      test: t => /ingresos brutos de CABA/i.test(t) },
+    { clave: 'comision', etiqueta: null, // 'Com <Mes> <Año>'
+      test: t => /Costo de Mercado Pago/i.test(t) }
+  ];
+  // precio de lista de la terminal SmartPos; los tramos del identificador traen el descuento
+  const PRECIO_TERMINAL = 79900;
+
+  const ES_PLATAFORMA = t => /Comisi[óo]n por uso de plataforma de terceros/i.test(t);
+  const ES_RENDIMIENTO = t => /Rendimiento (positivo|negativo) de la inversi[óo]n/i.test(t);
+  const ES_RETIRO = t => /^Retiro de dinero$/i.test(t);
+  const ES_DETALLE = t => /^(Cobro|Devoluci[óo]n (parcial )?de cobro|(Anulaci[óo]n de )?[Dd]inero retenido por contracargo)$/i.test(t);
+
+  function clasificaMovimiento(tipo) {
+    const t = txt(tipo);
+    if (ES_DETALLE(t)) return { grupo: 'detalle' };
+    if (ES_RENDIMIENTO(t)) return { grupo: 'rendimiento' };
+    if (ES_RETIRO(t)) return { grupo: 'retiro' };
+    if (ES_PLATAFORMA(t)) return { grupo: 'plataforma' };
+    for (const a of AGREGADOS) if (a.test(t)) return { grupo: 'agregado', clave: a.clave };
+    return { grupo: 'desconocido' };
+  }
+
+  // ---------- clasificación de la transacción ----------
+  // Devuelve la categoría de negocio a partir del identificador y el detalle de venta
+  function clasificaTx(ident, detalle) {
+    const id = txt(ident);
+    const d = txt(detalle);
+    if (/^TFP[:\-]/i.test(id) || /^TFP[:\-]/i.test(d)) return 'smartpos';
+    if (/hardware/i.test(d)) return 'hardware';
+    if (/Deuda por comisiones/i.test(d)) return 'deuda_comisiones';
+    if (/Tu delivery/i.test(d) || /fee_payment/i.test(id)) return 'tu_delivery';
+    if (/^FUDO-/i.test(id)) return 'paid_online';
+    if (/^\d+::\d+/.test(id)) return 'suscripcion';
+    if (id.includes('@')) return 'suscripcion';
+    return 'sin_clasificar';
+  }
+
+  // ---------- índices de diccionarios ----------
+  function indexarCuentas(filas) {
+    // filas: [{ID, Nombre, ...}] del reporte accounts de Dash
+    const porId = new Map(), porNombre = new Map();
+    const c = mapearColumnas(filas, { id: ['ID'], nombre: ['Nombre'] });
+    for (const f of filas) {
+      const id = txt(f[c.id]);
+      const nombre = txt(f[c.nombre]);
+      if (!/^\d+$/.test(id)) continue;
+      if (!porId.has(id)) porId.set(id, nombre);
+      const k = norm(nombre);
+      if (!k) continue;
+      if (!porNombre.has(k)) porNombre.set(k, []);
+      porNombre.get(k).push(id);
+    }
+    return { porId, porNombre };
+  }
+
+  function indexarOdoo(filas) {
+    // filas: export de Odoo res.partner (Referencia = ID de Dash)
+    const porRef = new Map();
+    const c = mapearColumnas(filas, {
+      ref: ['Referencia', 'Ref'], contacto: ['ID'],
+      rz: ['Nombre', 'Entidad del nombre de la compañía'], nif: ['NIF', 'CUIT'],
+      condicion: ['Tipo de Responsabilidad AFIP', 'Responsabilidad AFIP'],
+      email: ['Correo electrónico']
+    });
+    for (const f of filas) {
+      const ref = txt(f[c.ref]);
+      if (!/^\d+$/.test(ref)) continue;   // ignoro referencias no numéricas (Interna, SERSA, etc.)
+      const reg = {
+        contacto: txt(f[c.contacto]), rz: txt(f[c.rz]), nif: txt(f[c.nif]),
+        condicion: txt(f[c.condicion]), email: txt(f[c.email])
+      };
+      if (!porRef.has(ref)) porRef.set(ref, []);
+      porRef.get(ref).push(reg);
+    }
+    // si hay más de un contacto por referencia, dejo primero el de ID más bajo (el original)
+    for (const regs of porRef.values()) {
+      if (regs.length > 1) regs.sort((a, b) => (parseInt(a.contacto, 10) || 0) - (parseInt(b.contacto, 10) || 0));
+    }
+    return porRef;
+  }
+
+  // ===========================================================================
+  //  PROCESO PRINCIPAL
+  // ===========================================================================
+  function procesar(opts) {
+    const movimientos = opts.movimientos || [];
+    const transacciones = opts.transacciones || [];
+    const cuentas = indexarCuentas(opts.cuentas || []);
+    const odoo = indexarOdoo(opts.odoo || []);
+    const alias = opts.alias || {};          // { 'handle o id de operación': 'idDash' }
+    const desde = opts.desde || null;        // 'YYYY-MM-DD'
+    const hasta = opts.hasta || null;
+
+    const avisos = [];
+    const aviso = (tipo, msg, ref) => avisos.push({ tipo, msg, ref: ref || '' });
+
+    // --- índice de transacciones por ID de operación MP ---
+    const cTx = mapearColumnas(transacciones, COLS_TX);
+    const txPorOp = new Map();
+    if (transacciones.length && !cTx.op) {
+      aviso('archivo', 'En el archivo de transacciones no encuentro la columna del ID de operación de Mercado Pago, así que no puedo identificar ningún cobro. Revisá que sea el reporte de "Todas las transacciones".');
+    }
+    for (const t of transacciones) {
+      const op = txt(t[cTx.op]);
+      if (!op) continue;
+      if (!txPorOp.has(op)) txPorOp.set(op, t);
+    }
+    const identDe = t => txt(t[cTx.ident]);
+    const detalleDe = t => limpiaComillas(t[cTx.detalle]);
+
+    // --- normalizo movimientos y filtro por período ---
+    const cMov = mapearColumnas(movimientos, COLS_MOV);
+    if (movimientos.length && (!cMov.tipo || !cMov.importe || !cMov.op)) {
+      aviso('archivo', 'En el archivo de movimientos falta alguna de las columnas esperadas (Fecha de Pago, Tipo de Operación, Operación Relacionada, Importe). Revisá que sea el reporte de balance de Mercado Pago.');
+    }
+    let movs = movimientos.map(m => ({
+      ts: txt(m[cMov.fecha]),
+      fecha: fechaDe(m[cMov.fecha]),
+      tipo: txt(m[cMov.tipo]),
+      nro: txt(m[cMov.nro]),
+      op: txt(m[cMov.op]),
+      importe: num(m[cMov.importe])
+    })).filter(m => m.tipo);
+
+    if (desde) movs = movs.filter(m => m.fecha >= desde);
+    if (hasta) movs = movs.filter(m => m.fecha <= hasta);
+    movs.sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
+
+    const fechas = movs.map(m => m.fecha).filter(Boolean).sort();
+    const fDesde = fechas[0] || desde || '';
+    const fHasta = fechas[fechas.length - 1] || hasta || '';
+
+    // --- paso 1: netear cobros contra devoluciones / anulaciones / contracargos
+    //     del mismo ID de pago. Lo que da cero se elimina de las dos puntas.
+    const netoPorOp = new Map(), cantPorOp = new Map(), tieneReverso = new Set();
+    for (const m of movs) {
+      if (!ES_DETALLE(m.tipo) || !m.op) continue;
+      netoPorOp.set(m.op, r2((netoPorOp.get(m.op) || 0) + m.importe));
+      cantPorOp.set(m.op, (cantPorOp.get(m.op) || 0) + 1);
+      if (/Devoluci[óo]n|Anulaci[óo]n|contracargo/i.test(m.tipo)) tieneReverso.add(m.op);
+    }
+    const cobroPorOp = new Set();
+    for (const m of movs) if (/^Cobro$/i.test(m.tipo) && m.op) cobroPorOp.add(m.op);
+    const opsEmitidas = new Set();
+    const opsAnuladas = new Set();
+    for (const [op, neto] of netoPorOp) {
+      if (Math.abs(neto) < 0.005 && cantPorOp.get(op) > 1 && tieneReverso.has(op)) opsAnuladas.add(op);
+    }
+    const anuladas = movs.filter(m => ES_DETALLE(m.tipo) && opsAnuladas.has(m.op));
+
+    // --- paso 2: recorro movimientos ---
+    const extracto = [];                 // filas del extracto final
+    const buckets = {
+      deuda_comisiones: [], tu_delivery: [], paid_online: [], sin_clasificar: [], contracargos: []
+    };
+    const totalesAgregados = new Map();  // clave -> importe
+    let totalPlataforma = 0, cantPlataforma = 0, costoExcluido = 0, sinTx = 0;
+    const desconocidos = new Map();
+
+    const existeDash = d => !!d && (cuentas.porId.has(d) || odoo.has(d));
+    const porNombreUnico = n => {
+      const c = cuentas.porNombre.get(norm(n)) || [];
+      return c.length === 1 ? c[0] : '';
+    };
+
+    function resolverDash(cat, ident, op, detalle) {
+      let id = txt(ident);
+      if (cat === 'smartpos') {
+        // el identificador TFP puede venir en el campo identificación o en el detalle de venta
+        if (!/^TFP[:\-]/i.test(id)) id = txt(detalle);
+        const p = id.split(':');
+        const nombreIdent = txt(p[p.length - 1]);
+        const codigo = txt(p[2]);          // 1;75 = SmartPos · 2;50 = hardware/terminal
+        let dash = txt(p[1]);
+        if (alias[op]) dash = txt(alias[op]);
+        else if (!existeDash(dash)) {
+          // a veces el segundo tramo no es el ID de Dash: lo busco por nombre de cuenta
+          const porNombre = porNombreUnico(nombreIdent);
+          if (porNombre) dash = porNombre;
+          else if (alias[nombreIdent]) dash = txt(alias[nombreIdent]);
+          else {
+            aviso('sin_cuenta', `Venta SmartPos "${nombreIdent}": no pude resolver el ID de Dash (el identificador trae ${txt(p[1])}). Cargalo a mano.`, op);
+            dash = '';
+          }
+        }
+        return { dash, nombreIdent, factura: '', codigo, cuenta: txt(p[0]) || 'TFP' };
+      }
+      if (/^\d+::/.test(id)) {
+        const p = id.split('::');
+        return { dash: txt(p[0]), nombreIdent: txt(p[0]), factura: txt(p[1]) };
+      }
+      if (id.includes('@')) {
+        const handle = id.split('@').slice(1).join('@');
+        if (alias[op] || alias[handle]) return { dash: txt(alias[op] || alias[handle]), nombreIdent: handle, factura: '' };
+        const cands = cuentas.porNombre.get(norm(handle)) || [];
+        if (cands.length === 1) return { dash: cands[0], nombreIdent: handle, factura: '' };
+        if (cands.length > 1) {
+          aviso('ambiguo', `El usuario "${id}" coincide con ${cands.length} cuentas de Dash (${cands.join(', ')}). Elegí una.`, op);
+          return { dash: '', nombreIdent: handle, factura: '', pendiente: true };
+        }
+        aviso('sin_cuenta', `No encontré la cuenta de Dash para "${id}". Cargá el ID a mano.`, op);
+        return { dash: '', nombreIdent: handle, factura: '', pendiente: true };
+      }
+      if (alias[op]) return { dash: txt(alias[op]), nombreIdent: id, factura: '' };
+      return { dash: '', nombreIdent: id, factura: '', pendiente: true };
+    }
+
+    // misma resolución pero sin generar avisos (para las filas que no van al extracto)
+    function resolverDashSilencioso(cat, ident, op, detalle) {
+      const n = avisos.length;
+      const r = resolverDash(cat, ident, op, detalle);
+      avisos.length = n;
+      return r;
+    }
+
+    function datosOdoo(dash, op, desc) {
+      if (!dash) return { contacto: '', rz: '', condicion: '', nif: '' };
+      const regs = odoo.get(dash);
+      if (!regs || !regs.length) {
+        aviso('sin_odoo', `Sin contacto de Odoo para el ID de Dash ${dash}${desc ? ' (' + desc + ')' : ''}.`, op);
+        return { contacto: '', rz: '', condicion: '', nif: '' };
+      }
+      if (regs.length > 1) {
+        aviso('odoo_duplicado',
+          `El ID de Dash ${dash} tiene ${regs.length} contactos en Odoo (${regs.map(r => r.contacto).join(', ')}). Verificá cuál corresponde.`, op);
+      }
+      return regs[0];
+    }
+
+    for (const m of movs) {
+      const c = clasificaMovimiento(m.tipo);
+
+      if (c.grupo === 'agregado') {
+        // Impuestos, retenciones y costo de Mercado Pago quedan SIEMPRE en este
+        // extracto, también los de Tu delivery y deuda por comisiones. Al extracto
+        // de la tienda online se va únicamente el total de lo que pagó el cliente.
+        totalesAgregados.set(c.clave, r2((totalesAgregados.get(c.clave) || 0) + m.importe));
+        continue;
+      }
+      if (c.grupo === 'plataforma') { totalPlataforma = r2(totalPlataforma + m.importe); cantPlataforma++; continue; }
+      if (c.grupo === 'rendimiento') {
+        extracto.push({
+          ts: m.ts, fecha: m.fecha, tipo: '', descripcion: m.tipo, contacto: '', op: m.op,
+          importe: m.importe, metadata: '', cuenta: '', dash: '', factura: '',
+          colJ: '', colK: '', colL: '', colM: '', refMP: '',
+          rz: '', condicion: '', nif: '', categoria: 'rendimiento'
+        });
+        continue;
+      }
+      if (c.grupo === 'retiro') {
+        aviso('retiro', `Retiro de dinero de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo puse como "Transf. MP a BBVA". Si es un pago a un proveedor, cambiale la descripción y asignale el contacto de Odoo.`, m.op);
+        extracto.push({
+          ts: m.ts, fecha: m.fecha, tipo: '', descripcion: 'Transf. MP a BBVA', contacto: '', op: m.op,
+          importe: m.importe, metadata: '', cuenta: '', dash: '', factura: '',
+          colJ: '', colK: '', colL: '', colM: '', refMP: '',
+          rz: '', condicion: '', nif: '', categoria: 'retiro', tipoMP: m.tipo
+        });
+        continue;
+      }
+      if (c.grupo === 'desconocido') {
+        // tipos que no tengo mapeados (percepciones, compras, etc.): van igual al
+        // extracto con la descripción que trae MP, para no perderlos
+        desconocidos.set(m.tipo, r2((desconocidos.get(m.tipo) || 0) + m.importe));
+        const esPago = /^pag/i.test(m.tipo);
+        const tOtro = txPorOp.get(m.op);
+        const detOtro = tOtro ? detalleDe(tOtro) : '';
+        // si la transacción trae el detalle, lo usamos; si no, queda vacío para
+        // que se identifique a mano en Mercado Pago
+        const descOtro = esPago ? (detOtro ? `Compra - ${detOtro}` : '') : m.tipo;
+        aviso('movimiento', esPago
+          ? (detOtro
+              ? `Pago de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo puse como "${descOtro}" con el detalle de la transacción.`
+              : `Pago de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo dejé sin descripción para que lo identifiques en Mercado Pago.`)
+          : `Movimiento "${m.tipo}" de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo dejé en el extracto con esa descripción. Cambiala si corresponde.`, m.op);
+        extracto.push({
+          ts: m.ts, fecha: m.fecha, tipo: '', descripcion: descOtro, contacto: '', op: m.op,
+          importe: m.importe,
+          metadata: tOtro ? txt(tOtro[cTx.extra]) : '',
+          cuenta: tOtro ? identDe(tOtro) : '',
+          dash: '', factura: '',
+          colJ: '', colK: '', colL: '', colM: '', refMP: detOtro,
+          rz: '', condicion: '', nif: '', categoria: 'otro', tipoMP: m.tipo
+        });
+        continue;
+      }
+
+      // --- detalle: Cobro / Devolución (total o parcial) / Contracargo ---
+      if (opsAnuladas.has(m.op)) continue; // cobro + devolución que se cancelan
+      // un ID de pago = una sola fila: si hubo devolución parcial o anulación,
+      // va el neto y no dos renglones
+      if (m.op) {
+        if (opsEmitidas.has(m.op)) continue;
+        opsEmitidas.add(m.op);
+      }
+      const importeNeto = m.op && netoPorOp.has(m.op) ? netoPorOp.get(m.op) : m.importe;
+      const tieneCobro = m.op ? cobroPorOp.has(m.op) : false;
+
+      const t = txPorOp.get(m.op);
+      if (!t) sinTx++;
+      const ident = t ? identDe(t) : '';
+      const detalle = t ? detalleDe(t) : '';
+      const metadata = t ? txt(t[cTx.extra]) : '';
+      const cat = t ? clasificaTx(ident, detalle) : 'sin_clasificar';
+      const esDevolucion = !tieneCobro && /^Devoluci[óo]n/i.test(m.tipo);
+      const esContracargo = !tieneCobro && /contracargo/i.test(m.tipo);
+      const tipoContracargo = esContracargo ? m.tipo : '';
+
+      // el identificador de MP viene con los tramos separados por ":" — los dejo
+      // en columnas, igual que el "texto en columnas" del extracto armado a mano
+      const identEfectivo = (cat === 'smartpos' && !/^TFP[:\-]/i.test(ident)) ? detalle : ident;
+      const tramos = txt(identEfectivo).split(':');
+
+      const base = {
+        ts: m.ts, fecha: m.fecha, op: m.op, importe: importeNeto,
+        metadata, refMP: detalle, ident, categoria: cat,
+        colJ: txt(tramos[2]), colK: txt(tramos[3]), colL: txt(tramos[4]), colM: txt(tramos[5]),
+        medio: t ? txt(t[cTx.medio]) : '',
+        comisionMP: t ? num(t[cTx.comision]) : 0,
+        neto: t ? num(t[cTx.neto]) : 0
+      };
+
+      // Tu delivery, deuda por comisiones y comisión de terceros van a otro diario:
+      // salen del extracto con todo lo suyo, incluidos sus contracargos y anulaciones.
+      // Los contracargos de cualquier otro concepto sí quedan dentro del extracto.
+      if (cat === 'deuda_comisiones' || cat === 'tu_delivery' || cat === 'paid_online') {
+        const res = resolverDashSilencioso(cat, ident, m.op, detalle);
+        buckets[cat].push(Object.assign({}, base, {
+          tipo: m.tipo, dash: res.dash,
+          descripcion: cuentas.porId.get(res.dash) || res.nombreIdent || detalle
+        }));
+        continue;
+      }
+      if (cat === 'sin_clasificar') {
+        aviso('sin_identificar', `Cobro de ${importeNeto.toLocaleString('es-AR')} el ${m.fecha} sin identificación en Mercado Pago: quedó en el extracto sin descripción.`, m.op);
+        extracto.push(Object.assign({}, base, {
+          tipo: tieneCobro ? 'Cobro' : m.tipo, descripcion: detalle, contacto: '', cuenta: '',
+          dash: '', rz: '', condicion: '', nif: '', tipoMP: m.tipo
+        }));
+        continue;
+      }
+
+      // --- va al extracto ---
+      const res = resolverDash(cat, ident, m.op, detalle);
+      let nombre = cuentas.porId.get(res.dash) || '';
+      if (!nombre && cat !== 'hardware') nombre = res.nombreIdent;
+      // La venta de hardware va sin cuenta y sin contacto: sólo el rótulo.
+      // Se factura aparte, así que el comprador no hace falta acá.
+
+      let descripcion;
+      if (cat === 'smartpos') descripcion = `Venta SmartPos - ${nombre || res.nombreIdent}`;
+      else if (cat === 'hardware') descripcion = 'Venta de Hardware';
+      else descripcion = nombre;
+
+      // en las ventas de hardware no se usan los tramos del identificador
+      if (cat === 'hardware' || /^Venta de Hardware/.test(descripcion)) {
+        base.colJ = base.colK = base.colL = base.colM = '';
+      }
+
+      if (/^Venta SmartPos/.test(descripcion)) {
+        const det = detalleTerminales([base.colJ, base.colK, base.colL], importeNeto,
+                                      opts.precioTerminal != null ? opts.precioTerminal : PRECIO_TERMINAL);
+        base.lineas = det.lineas; base.descuento = det.descuento;
+        base.qTerminales = det.cantidad; base.teorico = det.teorico;
+        // en una devolución el importe viene en negativo: el control no aplica
+        base.control = importeNeto > 0 ? det.control : '';
+        if (det.control !== '' && Math.abs(det.control) > 0.5 && importeNeto > 0) {
+          aviso('terminal', `La venta SmartPos de "${base.nombreCuenta}" debería dar ${det.teorico.toLocaleString('es-AR')} según los descuentos (${det.descuento}) y cobró ${importeNeto.toLocaleString('es-AR')}.`, m.op);
+        }
+      }
+
+      const od = datosOdoo(res.dash, m.op, descripcion);
+
+      // La descripción es siempre el nombre de la cuenta, que sale del reporte
+      // accounts por ID de Dash. Si la cuenta no está ahí, cae a la razón social
+      // de Odoo y por último al usuario del identificador.
+      // en las terminales, si la cuenta no está en accounts, el identificador TFP
+      // ya trae el nombre de la terminal; en el resto cae a la razón social
+      // En hardware el identificador (FUDO-…-…) es siempre la cuenta de
+      // pruebas, así que el nombre sale únicamente del ID de Dash contra accounts.
+      // Si ese ID no está, la descripción queda vacía para completarla a mano.
+      const nombreCta = cat === 'hardware' ? ''
+        : (cuentas.porId.get(res.dash) ||
+           (cat === 'smartpos' ? (res.nombreIdent || od.rz) : (od.rz || res.nombreIdent)));
+      const nombreFinal = nombreCta;
+      base.nombreCuenta = nombreCta;
+      if (/^Venta SmartPos/.test(descripcion)) descripcion = `Venta SmartPos - ${nombreCta}`;
+      else if (cat === 'hardware') descripcion = 'Venta de Hardware';
+      else if (!esDevolucion && !esContracargo) descripcion = nombreFinal;
+      // las devoluciones van sin tipo de operación y sin contacto
+      if (esDevolucion) {
+        // en las terminales la devolución nombra la terminal, no la razón social;
+        // la de hardware mantiene el rótulo para que se reconozca en el extracto
+        descripcion = /^Venta SmartPos/.test(descripcion)
+          ? `Venta SmartPos - Devolución de cobro - Terminal - ${res.nombreIdent}`
+          : cat === 'hardware'
+          ? 'Venta de Hardware - Devolución de cobro'
+          : `Devolución de cobro - ${nombreFinal}`;
+      }
+      if (esContracargo) descripcion = nombreCta ? `${m.tipo} - ${nombreCta}` : m.tipo;
+
+      extracto.push(Object.assign({}, base, {
+        tipo: (esContracargo || esDevolucion) ? '' : 'Cobro',
+        descripcion,
+        // la venta de hardware se factura aparte: no lleva cuenta, contacto ni ID de Dash
+        contacto: (esDevolucion || esContracargo || cat === 'hardware') ? '' : od.contacto,
+        cuenta: res.cuenta || res.nombreIdent,
+        dash: cat === 'hardware' ? '' : res.dash,
+        factura: res.factura,
+        rz: cat === 'hardware' ? '' : od.rz,
+        condicion: cat === 'hardware' ? '' : od.condicion,
+        nif: cat === 'hardware' ? '' : od.nif
+      }));
+    }
+
+    // --- paso 3: líneas agregadas al pie, con la fecha del último día ---
+    const pie = [];
+    for (const a of AGREGADOS) {
+      if (!totalesAgregados.has(a.clave)) continue;
+      let etiqueta = a.etiqueta;
+      if (a.clave === 'comision') {
+        etiqueta = txt(opts.etiquetaComision) || etiquetaComisionPorDefecto(fHasta);
+      }
+      pie.push({
+        ts: fHasta + 'T23:59:59Z', fecha: fHasta, tipo: '', descripcion: etiqueta, contacto: '',
+        op: '', importe: totalesAgregados.get(a.clave), metadata: '', cuenta: '', dash: '',
+        factura: '', colJ: '', colK: '', colL: '', colM: '',
+        refMP: '', rz: '', condicion: '', nif: '', categoria: 'agregado'
+      });
+    }
+    const filas = extracto.concat(pie);
+
+    // --- controles ---
+    const sumaMov = r2(movs.reduce((s, m) => s + m.importe, 0));
+    const sumaExtracto = r2(filas.reduce((s, f) => s + f.importe, 0));
+    const sumaBuckets = r2(costoExcluido +
+      ['deuda_comisiones', 'tu_delivery', 'paid_online', 'sin_clasificar', 'contracargos']
+        .reduce((s, k) => s + buckets[k].reduce((a, x) => a + x.importe, 0), 0));
+    const sumaAnuladas = r2(anuladas.reduce((s, m) => s + m.importe, 0));
+
+    // --- todo cobro tiene que tener ID de Dash para que se completen
+    //     la descripción y el contacto de Odoo ---
+    // la venta de hardware va sin cuenta por definición: no cuenta como pendiente
+    const sinId = filas.filter(f => f.tipo === 'Cobro' && !txt(f.dash) && f.categoria !== 'hardware');
+    if (sinId.length) {
+      aviso('sin_id', `${sinId.length} ${sinId.length === 1 ? 'cobro quedó' : 'cobros quedaron'} sin ID de Dash, así que ${sinId.length === 1 ? 'su descripción y su contacto de Odoo están' : 'sus descripciones y contactos de Odoo están'} incompletos. Cargá el ID en el panel de pendientes.`);
+    }
+
+    // --- ¿el reporte de transacciones cubre el período? ---
+    const fechasTx = [];
+    if (cTx.fecha) for (const t of transacciones) {
+      const f = fechaDe(t[cTx.fecha]);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(f)) fechasTx.push(f);
+    }
+    fechasTx.sort();
+    const periodoTx = fechasTx.length ? { desde: fechasTx[0], hasta: fechasTx[fechasTx.length - 1] } : null;
+    if (sinTx) {
+      const cobertura = periodoTx
+        ? ` El reporte de transacciones cubre del ${periodoTx.desde} al ${periodoTx.hasta} y los movimientos van del ${fDesde} al ${fHasta}.`
+        : '';
+      aviso('sin_transaccion',
+        `${sinTx} ${sinTx === 1 ? 'cobro quedó sin identificar porque no encontré su transacción' : 'cobros quedaron sin identificar porque no encontré su transacción'}.${cobertura} Bajá de Mercado Pago el reporte de "Todas las transacciones" del mismo período que el balance.`);
+    }
+
+    // --- control de IDs de pago repetidos en el extracto ---
+    const porOp = new Map();
+    for (const f of filas) {
+      if (!f.op) continue;
+      if (!porOp.has(f.op)) porOp.set(f.op, []);
+      porOp.get(f.op).push(f);
+    }
+    const duplicados = [];
+    for (const [op, fs] of porOp) {
+      if (fs.length < 2) continue;
+      const tipos = Array.from(new Set(fs.map(f => f.categoria)));
+      let motivo;
+      if (fs.every(f => f.importe === fs[0].importe)) motivo = 'mismas filas repetidas: revisá si el reporte de movimientos vino duplicado';
+      else if (tipos.length > 1) motivo = 'el mismo ID de pago quedó en dos conceptos distintos (' + tipos.join(' + ') + ')';
+      else motivo = 'el balance trae más de un movimiento de cobro con este ID de pago';
+      duplicados.push({ op, cantidad: fs.length, importes: fs.map(f => f.importe), descripciones: fs.map(f => f.descripcion), motivo });
+      aviso('duplicado', `El ID de pago ${op} aparece ${fs.length} veces en el extracto (${motivo}).`, op);
+    }
+
+    const control = {
+      duplicados,
+      periodo: { desde: fDesde, hasta: fHasta },
+      movimientos: movs.length,
+      filasExtracto: filas.length,
+      sumaMovimientos: sumaMov,
+      sumaExtracto: sumaExtracto,
+      sumaExcluidos: sumaBuckets,
+      costoExcluido,
+      sumaPlataforma: totalPlataforma,
+      cantPlataforma,
+      sumaAnuladas,
+      // el extracto + lo excluido + la comisión de plataforma debe dar el total de movimientos
+      sinTransaccion: sinTx,
+      cobrosSinId: sinId.length,
+      periodoTx,
+      diferencia: r2(sumaMov - (sumaExtracto + sumaBuckets + totalPlataforma + sumaAnuladas)) || 0,
+      cobrosAnulados: anuladas.length / 2,
+      desconocidos: Array.from(desconocidos, ([tipo, importe]) => ({ tipo, importe }))
+    };
+
+    return { filas, buckets, control, avisos, totalesAgregados: Object.fromEntries(totalesAgregados) };
+  }
+
+  // 'Com Septiembre 2026' — la etiqueta por defecto usa el mes del cierre del período
+  function etiquetaComisionPorDefecto(fecha) {
+    const d = fecha ? new Date(fecha + 'T00:00:00Z') : new Date();
+    return `Com ${MESES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+
+  // Detalle de una venta de terminales a partir de los tramos "cantidad;descuento"
+  // del identificador TFP. Ej: 1;75 + 1;50 + 1;50 -> 3 terminales, 2 líneas, "75 y 50".
+  function detalleTerminales(tramos, importe, precioLista) {
+    const precio = Number(precioLista) || 0;
+    let cantidad = 0, teorico = 0;
+    const descuentos = [];
+    for (const t of tramos) {
+      const p = txt(t).split(';');
+      if (p.length < 2) continue;
+      const q = parseFloat(p[0]);
+      const d = parseFloat(String(p[1]).replace(',', '.'));
+      if (!q || isNaN(q) || isNaN(d)) continue;
+      cantidad += q;
+      teorico += q * precio * (1 - d / 100);
+      if (!descuentos.includes(d)) descuentos.push(d);
+    }
+    return {
+      lineas: descuentos.length || '',
+      descuento: descuentos.length === 1 ? descuentos[0] : descuentos.join(' Y '),
+      cantidad: cantidad || '',
+      teorico: r2(teorico),
+      control: precio ? r2(teorico - num(importe)) : ''
+    };
+  }
+
+  const API = { procesar, clasificaTx, clasificaMovimiento, fechaDe, norm, limpiaComillas, num, r2,
+                MESES, detalleTerminales, etiquetaComisionPorDefecto, PRECIO_TERMINAL };
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  root.MPCore = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const archivos = { mov:null, tx:null, acc:null, odoo:null };
+const datos    = { mov:null, tx:null, acc:null, odoo:null };
+let resultado = null, tabActiva = 'extracto';
+const ALIAS_KEY = 'mp-ar-alias-v1';
+const DESC_KEY = 'mp-ar-desc-v1';
+
+// El navegador bloquea localStorage cuando la página se abre desde el disco (file://),
+// así que el diccionario vive en memoria y se guarda además en localStorage si se puede.
+let aliasMem = {};
+try { aliasMem = JSON.parse(localStorage.getItem(ALIAS_KEY) || '{}'); } catch(e){ aliasMem = {}; }
+let aliasPersiste = true;
+function alias(){ return aliasMem; }
+function guardarAlias(a){
+  aliasMem = a;
+  try { localStorage.setItem(ALIAS_KEY, JSON.stringify(a)); }
+  catch(e){ aliasPersiste = false; }
+}
+// Descripciones que cargás a mano para los movimientos que Mercado Pago no identifica.
+// Los pagos (compras, gastos) cambian en cada movimiento, así que se aplican a la corrida
+// pero NO se guardan: descSesion vive mientras la página esté abierta, descMem es lo que
+// sí se recuerda entre corridas.
+let descSesion = {};
+let descMem = {};
+try { descMem = JSON.parse(localStorage.getItem(DESC_KEY) || '{}'); } catch(e){ descMem = {}; }
+// lo que se aplica = lo guardado + lo de esta sesión
+function descripciones(){ return Object.assign({}, descMem, descSesion); }
+function guardarDesc(d){
+  descMem = d;
+  try { localStorage.setItem(DESC_KEY, JSON.stringify(d)); }
+  catch(e){ aliasPersiste = false; }
+}
+function claveDesc(f){ return String(f.op || ('mov:' + f.fecha + ':' + f.importe)); }
+function aplicarDescripciones(){
+  const d = descripciones();
+  resultado.filas.forEach(f => {
+    const k = claveDesc(f);
+    if (d[k]) { f.descripcion = d[k]; f.descripcionManual = true; }
+  });
+}
+
+const fmt = n => (n===''||n===null||n===undefined||isNaN(n)) ? '' :
+  n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtEnt = n => (n||0).toLocaleString('es-AR');
+
+// ---------- lectura de archivos ----------
+function hojaAJson(buf, nombre){
+  if (/\.csv$/i.test(nombre)) {
+    const texto = new TextDecoder('utf-8').decode(buf).replace(/^﻿/,'');
+    return csvAJson(texto);
+  }
+  const wb = XLSX.read(buf, { type:'array', raw:true });
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+}
+// Cuenta separadores fuera de comillas: hay campos con comas adentro.
+function contarSep(linea, sep){
+  let n = 0, comillas = false;
+  for (let i = 0; i < linea.length; i++){
+    const c = linea[i];
+    if (c === '"') { comillas = !comillas; continue; }
+    if (!comillas && c === sep) n++;
+  }
+  return n;
+}
+// Los reportes de Dash arrancan con líneas de filtros antes del encabezado real, y
+// según de dónde salgan vienen con coma, punto y coma o tabulación. El encabezado es
+// la primera línea con más columnas.
+function csvAJson(texto){
+  const lineas = texto.replace(/^\uFEFF/,'').split(/\r?\n/);
+  const muestra = lineas.slice(0, 30);
+  let sep = ',', mejor = 0, fila = 0;
+  [',', ';', '\t'].forEach(s => {
+    muestra.forEach((l, i) => {
+      const n = contarSep(l, s);
+      if (n > mejor) { mejor = n; sep = s; fila = i; }
+    });
+  });
+  if (mejor < 1) { sep = ','; fila = 0; }
+  const wb = XLSX.read(lineas.slice(fila).join('\n'), { type:'string', raw:true, FS:sep });
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+}
+async function leerArchivo(file, clave){
+  const buf = await file.arrayBuffer();
+  if (/\.zip$/i.test(file.name)) {
+    const zip = await JSZip.loadAsync(buf);
+    const nombres = Object.keys(zip.files).filter(n => /accounts.*\.csv$/i.test(n));
+    const elegido = nombres[0] || Object.keys(zip.files).find(n => /\.csv$/i.test(n));
+    if (!elegido) throw new Error('El zip no trae ningún CSV de cuentas.');
+    return csvAJson(await zip.files[elegido].async('string'));
+  }
+  return hojaAJson(new Uint8Array(buf), file.name);
+}
+
+// ---------- drag & drop ----------
+document.querySelectorAll('.drop').forEach(zona => {
+  const input = zona.querySelector('input');
+  const clave = input.dataset.k;
+  const marcar = (f) => {
+    archivos[clave] = f;
+    zona.classList.add('ok');
+    zona.querySelector('.f').textContent = f.name;
+    zona.querySelector('.f').classList.remove('muted');
+    cargar(clave, f);
+  };
+  input.addEventListener('change', e => { if (e.target.files[0]) marcar(e.target.files[0]); });
+  ['dragenter','dragover'].forEach(ev => zona.addEventListener(ev, e => {
+    e.preventDefault(); zona.classList.add('over');
+  }));
+  ['dragleave','drop'].forEach(ev => zona.addEventListener(ev, e => {
+    e.preventDefault(); zona.classList.remove('over');
+  }));
+  zona.addEventListener('drop', e => { if (e.dataTransfer.files[0]) marcar(e.dataTransfer.files[0]); });
+});
+
+let cargando = 0;
+async function cargar(clave, file){
+  cargando++;
+  datos[clave] = null;
+  revisarListo();
+  const zona = document.querySelector('#d-' + clave);
+  const etiqueta = zona.querySelector('.f');
+  etiqueta.textContent = file.name + ' · leyendo…';
+  $('#estado').textContent = 'Leyendo ' + file.name + '…';
+  try {
+    datos[clave] = await leerArchivo(file, clave);
+    etiqueta.textContent = file.name + ' · ' + datos[clave].length.toLocaleString('es-AR') + ' filas';
+    if (clave === 'mov') sugerirFechas();
+  } catch(err){
+    zona.classList.remove('ok');
+    etiqueta.textContent = file.name;
+    $('#estado').innerHTML = '<span class="pill bad">No pude leer ' + file.name + ': ' + err.message + '</span>';
+  } finally {
+    cargando--;
+    if (!cargando && !$('#estado').innerHTML.includes('pill bad')) $('#estado').textContent = '';
+    revisarListo();
+  }
+}
+function sugerirFechas(){
+  const f = datos.mov.map(m => MPCore.fechaDe(m['Fecha de Pago'])).filter(Boolean).sort();
+  if (!f.length) return;
+  $('#desde').value = f[0];
+  $('#hasta').value = f[f.length-1];
+  $('#etiquetaCom').placeholder = MPCore.etiquetaComisionPorDefecto(f[f.length-1]);
+}
+function revisarListo(){
+  $('#btn').disabled = !(datos.mov && datos.tx) || cargando > 0;
+  $('#btn').textContent = cargando > 0 ? 'Leyendo archivos…' : 'Procesar';
+}
+
+// ---------- proceso ----------
+$('#btn').addEventListener('click', procesar);
+$('#btnAplicar').addEventListener('click', () => {
+  const a = alias();
+  document.querySelectorAll('#pendientes input[data-op]').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) a[inp.dataset.op] = v; else delete a[inp.dataset.op];
+  });
+  guardarAlias(a);
+  const guardadas = Object.assign({}, descMem);
+  document.querySelectorAll('#sinIdentificar input[data-k]').forEach(inp => {
+    const v = inp.value.trim();
+    const k = inp.dataset.k;
+    if (inp.dataset.permanente === '1') {
+      if (v) guardadas[k] = v; else delete guardadas[k];
+      delete descSesion[k];
+    } else {
+      // los pagos se usan en esta corrida y no quedan guardados
+      if (v) descSesion[k] = v; else delete descSesion[k];
+      delete guardadas[k];
+    }
+  });
+  guardarDesc(guardadas);
+  procesar();
+});
+$('#btnLimpiar').addEventListener('click', () => location.reload());
+
+function procesar(){
+  if (!datos.mov || !datos.tx) return;
+  $('#estado').textContent = 'Procesando…';
+  setTimeout(() => {
+    try {
+      resultado = MPCore.procesar({
+        movimientos: datos.mov, transacciones: datos.tx,
+        cuentas: datos.acc || [], odoo: datos.odoo || [],
+        alias: alias(),
+        desde: $('#desde').value || null, hasta: $('#hasta').value || null,
+        etiquetaComision: $('#etiquetaCom').value.trim() || null,
+        precioTerminal: parseFloat($('#precioTerminal').value) || 0
+      });
+      aplicarDescripciones();
+      pintar();
+      $('#estado').innerHTML = '<span class="pill ok">Listo</span>';
+    } catch(err){
+      console.error(err);
+      $('#estado').innerHTML = '<span class="pill bad">Error: ' + err.message + '</span>';
+    }
+  }, 20);
+}
+
+// ---------- pintado ----------
+function pintar(){
+  const c = resultado.control;
+  $('#cRes').classList.remove('hidden');
+  $('#cTabs').classList.remove('hidden');
+
+  $('#kpis').innerHTML = [
+    ['Período', c.periodo.desde + ' → ' + c.periodo.hasta],
+    ['Movimientos leídos', fmtEnt(c.movimientos)],
+    ['Filas del extracto', fmtEnt(c.filasExtracto)],
+    ['Total extracto', fmt(c.sumaExtracto)],
+    ['Deuda por comisiones', fmt(resultado.buckets.deuda_comisiones.reduce((s,x)=>s+x.importe,0))],
+    ['Comisión plataforma', fmt(c.sumaPlataforma)]
+  ].map(([l,v]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+
+  const ok = Math.abs(c.diferencia) < 0.05;
+  const dups = c.duplicados || [];
+  $('#cuadre').innerHTML =
+    `<div class="aviso ${dups.length ? 'bad' : ''}" style="${dups.length ? '' : 'background:var(--ok-suave);color:var(--ok);border-left-color:var(--ok)'}">
+      <div><b>IDs de pago:</b> ${dups.length
+        ? fmtEnt(dups.length) + ' repetidos en la columna Operación Relacionada.'
+        : 'ninguno repetido en la columna Operación Relacionada.'}
+      ${dups.length ? '<ul style="margin:6px 0 0;padding-left:18px">' + dups.map(d =>
+          `<li><b>${d.op}</b> · ${d.cantidad} veces (${d.importes.map(fmt).join(' / ')}) — ${esc(d.motivo)}</li>`).join('') + '</ul>' : ''}
+      </div></div>` +
+    `<div class="aviso ${ok?'':'bad'}" style="${ok?'background:var(--ok-suave);color:var(--ok);border-left-color:var(--ok)':''}">
+       <div><b>Cuadre:</b> extracto ${fmt(c.sumaExtracto)} + excluidos ${fmt(c.sumaExcluidos)}
+       + comisión de plataforma ${fmt(c.sumaPlataforma)} = ${fmt(c.sumaMovimientos)}
+       (total de movimientos del período). Diferencia ${fmt(c.diferencia)}.
+       ${c.cobrosAnulados ? '<br>Se eliminaron ' + fmtEnt(c.cobrosAnulados) + ' cobros que netean cero contra su devolución o anulación.' : ''}
+       </div></div>` +
+    (c.desconocidos.length
+      ? `<div class="aviso bad"><div><b>Tipos de movimiento que no reconozco:</b> ` +
+        c.desconocidos.map(d => `${d.tipo} (${fmt(d.importe)})`).join(' · ') + `</div></div>` : '');
+
+  pintarPendientes();
+  pintarAvisos();
+  pintarTabs();
+  const n = `Extracto MP ${c.periodo.desde} al ${c.periodo.hasta}.xlsx`;
+  $('#nombreArchivo').textContent = n;
+  $('#btnXlsx').onclick = () => descargar(n);
+}
+
+function pintarPendientes(){
+  // Todo cobro tiene que tener ID de Dash: sin él quedan incompletas la descripción
+  // y el contacto de Odoo. La venta de hardware es la excepción: va sin cuenta.
+  const pend = resultado.filas.filter(f => !f.dash && f.categoria !== 'hardware' &&
+      (f.tipo === 'Cobro' || ['smartpos','suscripcion'].includes(f.categoria)));
+  const a = alias();
+  const sinId = filasSinIdentificar();
+  if (!pend.length && !sinId.length) {
+    $('#cPend').classList.add('hidden'); $('#pendientes').innerHTML = ''; return;
+  }
+  $('#cPend').classList.remove('hidden');
+  if (!pend.length) { $('#pendientes').innerHTML = ''; pintarSinIdentificar(); return; }
+  $('#pendientes').innerHTML =
+    `<div class="scroll"><table class="fix"><thead><tr>
+      <th>Fecha</th><th>Detalle MP</th><th>Descripción</th><th>Importe</th><th>Op. MP</th><th>ID de Dash</th>
+     </tr></thead><tbody>` +
+    pend.map(f => `<tr>
+        <td>${f.fecha}</td>
+        <td>${esc(f.refMP || f.ident)}</td>
+        <td>${esc(f.descripcion)}</td>
+        <td class="n">${fmt(f.importe)}</td>
+        <td class="n">${f.op}</td>
+        <td><input data-op="${f.op}" value="${esc(a[f.op] || '')}" placeholder="ID Dash"></td>
+      </tr>`).join('') + `</tbody></table></div>`;
+  pintarSinIdentificar();
+  const nota = $('#avisoPersistencia');
+  if (!aliasPersiste) {
+    nota.classList.remove('hidden');
+    nota.innerHTML = 'Abriendo el archivo desde el disco el navegador no deja guardar el diccionario solo. ' +
+      'Usá <b>Exportar diccionario</b> al terminar y <b>Importar diccionario</b> la próxima vez.';
+  } else nota.classList.add('hidden');
+}
+
+function pintarAvisos(){
+  const av = resultado.avisos;
+  if (!av.length) { $('#cAvisos').classList.add('hidden'); return; }
+  $('#cAvisos').classList.remove('hidden');
+  const clase = t => (t === 'odoo_duplicado' || t === 'sin_odoo') ? 'bad' : 'warn';
+  $('#avisos').innerHTML = av.map(a =>
+    `<div class="aviso ${clase(a.tipo)}"><div>${esc(a.msg)}${a.ref ? ' <b>' + a.ref + '</b>' : ''}</div></div>`).join('');
+}
+
+const TABS = [
+  ['extracto','Extracto MP'],
+  ['saas','Saas'],
+  ['terminales','Terminales'],
+  ['hardware','Hardware'],
+  ['deuda_comisiones','Deuda por comisiones'],
+  ['tu_delivery','Tu delivery'],
+  ['paid_online','Paid online'],
+  ['contracargos','Contracargos'],
+  ['sin_clasificar','Sin clasificar']
+];
+const esTerminal = f => /^Venta SmartPos/.test(f.descripcion || '');
+const esHardware = f => /^Venta de Hardware/.test(f.descripcion || '');
+// Terminales y Hardware se usan para facturar: los saldos negativos (devoluciones)
+// no van ahí, quedan sólo en el Extracto MP.
+const facturable = f => Number(f.importe) > 0;
+// Saas = los cobros identificados que no son venta de terminal ni de hardware:
+// esas dos se facturan aparte y tienen su propia hoja
+const esSaas = f => f.tipo === 'Cobro' && !esTerminal(f) && !esHardware(f)
+  && String(f.descripcion || '').trim() !== '';
+function filasDe(k){
+  if (k === 'extracto')   return resultado.filas;
+  if (k === 'terminales') return resultado.filas.filter(f => esTerminal(f) && facturable(f));
+  if (k === 'hardware')   return resultado.filas.filter(f => esHardware(f) && facturable(f));
+  if (k === 'saas')       return resultado.filas.filter(esSaas);
+  return resultado.buckets[k] || [];
+}
+const totalDe = k => filasDe(k).reduce((s, f) => s + (Number(f.importe) || 0), 0);
+function pintarTabs(){
+  $('#tabs').innerHTML = TABS.filter(([k]) => filasDe(k).length)
+    .map(([k,l]) => `<button data-t="${k}" class="${k===tabActiva?'on':''}">${l} <span class="muted">${filasDe(k).length}</span></button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
+    tabActiva = b.dataset.t; pintarTabs();
+  });
+  if (!filasDe(tabActiva).length) tabActiva = 'extracto';
+  pintarTabla();
+}
+function pintarTabla(){
+  const filas = filasDe(tabActiva).slice(0, 500);
+  const cols = (tabActiva === 'hardware')
+    ? [['fecha','Fecha'],['nombreCuenta','Cuenta'],['contacto','Contacto Odoo'],['op','Operación'],
+       ['importe','Importe'],['dash','ID Dash'],['rz','RZ'],['condicion','Condición IVA']]
+    : tabActiva === 'terminales'
+    ? [['fecha','Fecha'],['nombreCuenta','Cuenta'],['contacto','Contacto Odoo'],['importe','Importe'],
+       ['lineas','Línea'],['descuento','Descuento'],['qTerminales','Q terminales'],['control','Control'],
+       ['condicion','Condición IVA']]
+    : (tabActiva === 'extracto' || tabActiva === 'saas')
+    ? [['fecha','Fecha'],['tipo','Tipo'],['descripcion','Descripción'],['contacto','Contacto Odoo'],
+       ['op','Operación'],['importe','Importe'],['dash','ID Dash'],['condicion','Condición IVA']]
+    : [['fecha','Fecha'],['tipo','Tipo'],['descripcion','Descripción'],['refMP','Detalle MP'],
+       ['op','Operación'],['importe','Importe'],['dash','ID Dash']];
+  const todas = filasDe(tabActiva);
+  const iImp = cols.findIndex(([k]) => k === 'importe');
+  const total = todas.reduce((s, f) => s + (Number(f.importe) || 0), 0);
+  const pie = iImp < 0 ? '' :
+    '<tfoot><tr>' + cols.map(([k], i) =>
+      i === 0 ? `<td><b>Total · ${fmtEnt(todas.length)} fila${todas.length === 1 ? '' : 's'}</b></td>`
+      : i === iImp ? `<td class="n"><b>${fmt(total)}</b></td>` : '<td></td>').join('') + '</tr></tfoot>';
+  $('#tabla').innerHTML =
+    '<thead><tr>' + cols.map(([,l]) => `<th>${l}</th>`).join('') + '</tr></thead>' + pie + '<tbody>' +
+    filas.map(f => '<tr>' + cols.map(([k]) =>
+      (k === 'importe' || k === 'control') ? `<td class="n">${f[k] === '' || f[k] == null ? '' : fmt(f[k])}</td>`
+        : `<td>${esc(f[k] ?? '')}</td>`).join('') + '</tr>').join('') +
+    '</tbody>';
+}
+// Movimientos que quedaron sin descripción, o que ya nombraste vos a mano
+// Todo lo que Mercado Pago no identifica solo: movimientos sin descripción, tipos que
+// no están mapeados (compras, ajustes), retiros de dinero y cobros sin identificación.
+function filasSinIdentificar(){
+  const d = descripciones();
+  return resultado.filas.filter(f =>
+    f.categoria !== 'agregado' && (
+      String(f.descripcion || '').trim() === '' ||
+      f.categoria === 'otro' || f.categoria === 'retiro' || f.categoria === 'sin_clasificar' ||
+      d[claveDesc(f)]));
+}
+// Los pagos cambian en cada movimiento, así que se escriben por corrida y no se guardan.
+const esRecordable = f => !/^pag/i.test(String(f.tipoMP || ''));
+function pintarSinIdentificar(){
+  const filas = filasSinIdentificar();
+  const d = descripciones();
+  if (!filas.length) { $('#cSinId').classList.add('hidden'); $('#sinIdentificar').innerHTML = ''; return; }
+  $('#cSinId').classList.remove('hidden');
+  $('#sinIdentificar').innerHTML =
+    `<div class="scroll"><table class="fix"><thead><tr>
+      <th>Fecha</th><th>Tipo en MP</th><th>Detalle MP</th><th>Importe</th><th>Op. MP</th><th>Descripción a usar</th>
+     </tr></thead><tbody>` +
+    filas.map(f => {
+      const k = claveDesc(f);
+      // un pago depende de lo que figure en MP en ese movimiento: no tiene sentido guardarlo
+      const permanente = esRecordable(f);
+      return `<tr>
+        <td>${f.fecha}</td>
+        <td>${esc(f.tipoMP || f.tipo || '—')}</td>
+        <td>${esc(f.refMP || f.cuenta || '')}</td>
+        <td class="n">${fmt(f.importe)}</td>
+        <td class="n">${f.op || ''}</td>
+        <td><input data-k="${esc(k)}" data-permanente="${permanente ? 1 : 0}" style="width:300px"
+             value="${esc(d[k] || f.descripcion || '')}"
+             placeholder="De qué es este movimiento">
+            ${permanente ? '' : '<div class="muted" style="font-size:11px;margin-top:3px">no se guarda</div>'}</td>
+      </tr>`;
+    }).join('') + `</tbody></table></div>`;
+}
+
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------- diccionario ----------
+$('#btnExpAlias').onclick = () => {
+  const blob = new Blob([JSON.stringify({ cuentas: alias(), descripciones: descripciones() }, null, 2)],
+    {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'diccionario-cuentas-mp.json'; a.click();
+};
+$('#impAlias').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const nuevo = JSON.parse(await f.text());
+    // acepta el formato nuevo {cuentas, descripciones} y el viejo (sólo cuentas)
+    if (nuevo && (nuevo.cuentas || nuevo.descripciones)) {
+      guardarAlias(Object.assign(alias(), nuevo.cuentas || {}));
+      guardarDesc(Object.assign(descripciones(), nuevo.descripciones || {}));
+    } else {
+      guardarAlias(Object.assign(alias(), nuevo));
+    }
+    $('#estado').innerHTML = '<span class="pill ok">Diccionario importado</span>';
+    if (resultado) procesar();
+  } catch(err){ $('#estado').innerHTML = '<span class="pill bad">JSON inválido</span>'; }
+};
+
+// ---------- excel ----------
+// Mismo orden de columnas que el extracto armado a mano: A..O, y en Terminales
+// el cuadro azul Q..T con el detalle de líneas, descuentos y cantidad.
+const COLS_BASE = [
+  ['fecha','Fecha de Pago'],['tipo','Tipo de Operación'],['descripcion','Descripción'],
+  ['contacto','Contacto Odoo'],['op','Operación Relacionada'],['importe','Importe'],
+  ['metadata','metadata'],['cuenta','nombredelacuenta'],['dash','ID de Dash'],
+  ['colJ',''],['colK',''],['colL',''],['colM',''],['refMP','Id refe MP']
+];
+// el nombre de la cuenta (del reporte accounts, por ID de Dash) va al final
+const COLS_EXTRACTO = COLS_BASE.concat([['nombreCuenta','Nombre de cuenta']]);
+// en Terminales y Hardware el nombre de la cuenta ya es la Descripción;
+// la razón social y la condición frente al impuesto sólo van en Terminales
+const CON_CUENTA = COLS_BASE.map(c => c[0] === 'descripcion' ? ['nombreCuenta','Descripción'] : c);
+const COLS_HARDWARE = COLS_BASE;
+const COLS_TERMINALES = CON_CUENTA
+  .concat([['rz','RZ'],['condicion','Condición'],
+           ['lineas','LINEA'],['descuento','DESCUENTO'],['qTerminales','Q TERMINALES'],
+           ['control','CONTROL'],['contacto','ID ODOO'],['condicion','COND IMP']]);
+const COLS_BUCKET = [
+  ['fecha','Fecha de Pago'],['tipo','Tipo de Operación'],['descripcion','Descripción'],
+  ['op','Operación Relacionada'],['importe','Importe'],['dash','ID de Dash'],
+  ['ident','Identificación MP'],['refMP','Detalle de la venta'],['medio','Medio de pago'],
+  ['comisionMP','Comisiones + IVA'],['neto','Neto']
+];
+const NUMERICAS = ['importe','comisionMP','neto','control','qTerminales','lineas','contacto','dash'];
+const NARANJA = 'FF5023';   // el cuadro de terminales va en el naranja de Fudo
+
+function aHoja(filas, cols, opciones){
+  opciones = opciones || {};
+  const aoa = [cols.map(c => c[1])];
+  filas.forEach(f => aoa.push(cols.map(([k]) => {
+    if (k === '_') return '';
+    const v = f[k];
+    // serial de Excel: la fecha va sin hora, como en el archivo hecho a mano
+    if (k === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const p = v.split('-');
+      return Math.round((Date.UTC(+p[0], +p[1] - 1, +p[2]) - Date.UTC(1899, 11, 30)) / 86400000);
+    }
+    if (NUMERICAS.includes(k)) {
+      if (v === '' || v === null || v === undefined) return '';
+      const n = Number(v);
+      return isNaN(n) ? v : n;
+    }
+    return v ?? '';
+  })));
+  // Los totales se muestran en el procesador, no en el Excel: las hojas bajan sólo
+  // con datos para que se puedan importar y filtrar sin filas de más.
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates:true });
+  const rango = XLSX.utils.decode_range(ws['!ref']);
+  for (let fila = 0; fila <= rango.e.r; fila++) {
+    cols.forEach(([k], i) => {
+      const celda = ws[XLSX.utils.encode_cell({ r:fila, c:i })];
+      if (!celda) return;
+      if (fila === 0) {
+        celda.s = { font:{ bold:true } };
+        if ((opciones.azul || []).includes(k)) {
+          celda.s = { font:{ bold:true, color:{ rgb:'FFFFFF' } },
+                      fill:{ patternType:'solid', fgColor:{ rgb:NARANJA } } };
+        }
+        return;
+      }
+      if (k === 'fecha') celda.z = 'dd/mm/yyyy';
+      else if (k === 'importe' || k === 'comisionMP' || k === 'neto' || k === 'control') celda.z = '#,##0.00';
+    });
+  }
+  ws['!cols'] = cols.map(([k]) => ({ wch:
+    k === 'descripcion' || k === 'nombreCuenta' ? 34 : k === 'refMP' ? 30 : k === 'rz' ? 30 :
+    k === '_' ? 3 : k === 'metadata' ? 10 : 15 }));
+  ws['!freeze'] = { xSplit:0, ySplit:1 };
+  return ws;
+}
+
+function descargar(nombre){
+  const wb = XLSX.utils.book_new();
+  const terminales = resultado.filas.filter(f => esTerminal(f) && facturable(f));
+  const hardware = resultado.filas.filter(f => esHardware(f) && facturable(f));
+  const saas = resultado.filas.filter(esSaas);
+
+  XLSX.utils.book_append_sheet(wb, aHoja(resultado.filas, COLS_EXTRACTO), 'Extracto MP');
+  XLSX.utils.book_append_sheet(wb, aHoja(saas, COLS_EXTRACTO), 'Saas');
+  XLSX.utils.book_append_sheet(wb, aHoja(terminales, COLS_TERMINALES,
+    { azul:['lineas','descuento','qTerminales','control'] }), 'Terminales');
+  if (hardware.length) XLSX.utils.book_append_sheet(wb, aHoja(hardware, COLS_HARDWARE), 'Hardware');
+
+  // El detalle de deuda por comisiones y Tu delivery se ve en el procesador pero
+  // no baja: el Excel es sólo lo que se sube a Odoo, y ahí va todo junto.
+
+  const c = resultado.control;
+  const ctrl = [
+    ['Período', c.periodo.desde + ' al ' + c.periodo.hasta],
+    ['Movimientos leídos', c.movimientos],
+    ['Filas del extracto', c.filasExtracto],
+    ['Filas Saas', saas.length],
+    ['Filas Terminales', terminales.length],
+    ['Filas Hardware', hardware.length],
+    [],
+    ['Total extracto', c.sumaExtracto],
+    ['Total Saas', saas.reduce((s,f) => s + f.importe, 0)],
+    ['Total Terminales', terminales.reduce((s,f) => s + f.importe, 0)],
+    ['Total Hardware', hardware.reduce((s,f) => s + f.importe, 0)],
+    ['Deuda por comisiones (' + resultado.buckets.deuda_comisiones.length + ' filas, no se suben)',
+      resultado.buckets.deuda_comisiones.reduce((s,f) => s + f.importe, 0)],
+    ['Tu delivery (' + resultado.buckets.tu_delivery.length + ' filas, no se suben)',
+      resultado.buckets.tu_delivery.reduce((s,f) => s + f.importe, 0)],
+    ['Total excluidos (deuda, delivery, etc.)', c.sumaExcluidos],
+    ['Comisión por uso de plataforma (' + c.cantPlataforma + ' filas)', c.sumaPlataforma],
+    ['Total movimientos del período', c.sumaMovimientos],
+    ['Diferencia de cuadre', c.diferencia],
+    ['Cobros neteados contra devolución/anulación', c.cobrosAnulados],
+    ['IDs de pago repetidos', (c.duplicados || []).length],
+    ['Cobros sin ID de Dash', c.cobrosSinId || 0],
+    [],
+    ['Líneas agregadas', '']
+  ];
+  resultado.filas.filter(f => f.categoria === 'agregado').forEach(f => ctrl.push([f.descripcion, f.importe]));
+  if ((c.duplicados || []).length) {
+    ctrl.push([], ['ID de pago repetido', 'Motivo']);
+    c.duplicados.forEach(d => ctrl.push([d.op + ' (' + d.cantidad + ' veces)', d.motivo + ' · ' + d.descripciones.join(' / ')]));
+  }
+  if (resultado.avisos.length) {
+    ctrl.push([], ['Avisos', '']);
+    resultado.avisos.forEach(a => ctrl.push([a.tipo, a.msg + (a.ref ? ' (op ' + a.ref + ')' : '')]));
+  }
+  const ws = XLSX.utils.aoa_to_sheet(ctrl);
+  ws['!cols'] = [{wch:46},{wch:72}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Control');
+  XLSX.writeFile(wb, nombre);
+}
+})();
+</script>
+</body>
+</html>
