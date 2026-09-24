@@ -560,7 +560,14 @@
     const c = mapearColumnas(filas, {
       ref: ['Referencia', 'Ref'], contacto: ['ID'],
       rz: ['Nombre', 'Entidad del nombre de la compañía'], nif: ['NIF', 'CUIT'],
-      condicion: ['Tipo de Responsabilidad AFIP', 'Responsabilidad AFIP'],
+      // Odoo la exporta con distintos nombres según la versión y el campo elegido;
+      // si el export no trae ninguno, la columna COND IMP queda vacía y avisa.
+      condicion: ['Tipo de responsabilidad de ARCA', 'Tipo de Responsabilidad ARCA',
+                  'Responsabilidad de ARCA', 'Responsabilidad ARCA',
+                  'Tipo de Responsabilidad AFIP', 'Responsabilidad AFIP',
+                  'Condición frente al IVA', 'Condición frente al impuesto',
+                  'Condición frente al IVA del receptor', 'Responsabilidad AFIP/Nombre',
+                  'AFIP Responsibility Type', 'Posición fiscal'],
       email: ['Correo electrónico']
     });
     for (const f of filas) {
@@ -577,6 +584,8 @@
     for (const regs of porRef.values()) {
       if (regs.length > 1) regs.sort((a, b) => (parseInt(a.contacto, 10) || 0) - (parseInt(b.contacto, 10) || 0));
     }
+    // para avisar arriba si el export no trae la columna de condición
+    porRef.sinCondicion = filas.length > 0 && !c.condicion;
     return porRef;
   }
 
@@ -594,6 +603,9 @@
 
     const avisos = [];
     const aviso = (tipo, msg, ref) => avisos.push({ tipo, msg, ref: ref || '' });
+    if (odoo.sinCondicion)
+      aviso('archivo', 'El export de Odoo no trae la columna de condición frente al impuesto, así que ' +
+        'COND IMP y Condición van a quedar vacías. Agregala al export: "Tipo de responsabilidad de ARCA".');
 
     // --- índice de transacciones por ID de operación MP ---
     const cTx = mapearColumnas(transacciones, COLS_TX);
