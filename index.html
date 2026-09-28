@@ -645,13 +645,42 @@
 
     // --- paso 1: netear cobros contra devoluciones / anulaciones / contracargos
     //     del mismo ID de pago. Lo que da cero se elimina de las dos puntas.
+    // "Cobro por descuento a tu contraparte" es la parte del precio que pone
+    // Mercado Pago en una promo: es del mismo cobro, así que se suma ahí y no
+    // sale como fila aparte. Si no, la venta queda corta y el CONTROL no da cero.
+    const ES_DESC_CONTRAPARTE = t => /descuento a tu contraparte/i.test(txt(t));
     const netoPorOp = new Map(), cantPorOp = new Map(), tieneReverso = new Set();
     for (const m of movs) {
-      if (!ES_DETALLE(m.tipo) || !m.op) continue;
+      if (!m.op) continue;
+      if (!ES_DETALLE(m.tipo) && !ES_DESC_CONTRAPARTE(m.tipo)) continue;
       netoPorOp.set(m.op, r2((netoPorOp.get(m.op) || 0) + m.importe));
+      if (!ES_DETALLE(m.tipo)) continue;
       cantPorOp.set(m.op, (cantPorOp.get(m.op) || 0) + 1);
       if (/Devoluci[óo]n|Anulaci[óo]n|contracargo/i.test(m.tipo)) tieneReverso.add(m.op);
     }
+    // ops que tienen un cobro: ahí el descuento ya quedó sumado arriba y la fila
+    // suelta no va. Si el descuento viniera sin cobro, se deja como estaba.
+    const conDetalle = new Set();
+    for (const m of movs) if (m.op && ES_DETALLE(m.tipo)) conDetalle.add(m.op);
+
+    // Movimientos del mismo ID de pago que se cancelan entre sí (por ejemplo
+    // "Movimiento General" contra "Pago con descuento recibido", por el mismo
+    // importe y signo opuesto): no aportan nada al extracto, así que se van los dos.
+    const seCancelan = new Set();
+    (function(){
+      const grupos = new Map();
+      for (const m of movs) {
+        if (!m.op || !m.importe) continue;
+        if (clasificaMovimiento(m.tipo).grupo !== 'desconocido') continue;
+        const k = m.op + '|' + Math.abs(r2(m.importe));
+        if (!grupos.has(k)) grupos.set(k, { mas: [], menos: [] });
+        (m.importe > 0 ? grupos.get(k).mas : grupos.get(k).menos).push(m);
+      }
+      for (const g of grupos.values()) {
+        const pares = Math.min(g.mas.length, g.menos.length);
+        for (let i = 0; i < pares; i++) { seCancelan.add(g.mas[i]); seCancelan.add(g.menos[i]); }
+      }
+    })();
     const cobroPorOp = new Set();
     for (const m of movs) if (/^Cobro$/i.test(m.tipo) && m.op) cobroPorOp.add(m.op);
 
@@ -800,6 +829,10 @@
         });
         continue;
       }
+      // el descuento que pone Mercado Pago ya está sumado al cobro de ese ID
+      if (ES_DESC_CONTRAPARTE(m.tipo) && m.op && conDetalle.has(m.op)) continue;
+      // dos movimientos del mismo ID que se cancelan: no van ninguno de los dos
+      if (seCancelan.has(m)) continue;
       if (c.grupo === 'desconocido') {
         // tipos que no tengo mapeados (percepciones, compras, etc.): van igual al
         // extracto con la descripción que trae MP, para no perderlos
@@ -911,7 +944,9 @@
         // en una devolución el importe viene en negativo: el control no aplica
         base.control = importeNeto > 0 ? det.control : '';
         if (det.control !== '' && Math.abs(det.control) > 0.5 && importeNeto > 0) {
-          aviso('terminal', `La venta SmartPos de "${base.nombreCuenta}" debería dar ${det.teorico.toLocaleString('es-AR')} según los descuentos (${det.descuento}) y cobró ${importeNeto.toLocaleString('es-AR')}.`, m.op);
+          // el nombre de la cuenta todavía no está resuelto acá: lo busco igual que abajo
+          const nombreAviso = cuentas.porId.get(res.dash) || res.nombreIdent || `ID de Dash ${res.dash || '(sin ID)'}`;
+          aviso('terminal', `La venta SmartPos de "${nombreAviso}" debería dar ${det.teorico.toLocaleString('es-AR')} según los descuentos (${det.descuento}) y cobró ${importeNeto.toLocaleString('es-AR')}.`, m.op);
         }
       }
 
@@ -1045,6 +1080,7 @@
       periodoTx,
       diferencia: r2(sumaMov - (sumaExtracto + sumaBuckets + totalPlataforma + sumaAnuladas)) || 0,
       cobrosAnulados: anuladas.length / 2,
+      movimientosCancelados: seCancelan.size / 2,
       desconocidos: Array.from(desconocidos, ([tipo, importe]) => ({ tipo, importe }))
     };
 
@@ -1320,6 +1356,7 @@ function pintar(){
        + comisión de plataforma ${fmt(c.sumaPlataforma)} = ${fmt(c.sumaMovimientos)}
        (total de movimientos del período). Diferencia ${fmt(c.diferencia)}.
        ${c.cobrosAnulados ? '<br>Se eliminaron ' + fmtEnt(c.cobrosAnulados) + ' cobros que netean cero contra su devolución o anulación.' : ''}
+       ${c.movimientosCancelados ? '<br>Se eliminaron ' + fmtEnt(c.movimientosCancelados) + ' par(es) de movimientos del mismo ID que se cancelan entre sí.' : ''}
        </div></div>` +
     (c.desconocidos.length
       ? `<div class="aviso bad"><div><b>Tipos de movimiento que no reconozco:</b> ` +
@@ -1615,6 +1652,7 @@ function descargar(nombre){
     ['Total movimientos del período', c.sumaMovimientos],
     ['Diferencia de cuadre', c.diferencia],
     ['Cobros neteados contra devolución/anulación', c.cobrosAnulados],
+    ['Pares de movimientos que se cancelan (eliminados)', c.movimientosCancelados],
     ['IDs de pago repetidos', (c.duplicados || []).length],
     ['Cobros sin ID de Dash', c.cobrosSinId || 0],
     [],
