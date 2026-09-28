@@ -654,6 +654,34 @@
     }
     const cobroPorOp = new Set();
     for (const m of movs) if (/^Cobro$/i.test(m.tipo) && m.op) cobroPorOp.add(m.op);
+
+    // --- los impuestos de un pago no se separan al pie: van con el pago ---
+    // La factura del proveedor se carga por el total de la operación, así que el
+    // impuesto a los créditos y débitos (o lo que venga) tiene que quedar sumado
+    // al pago y no en la línea agregada del final.
+    const ES_PAGO = t => /^pago/i.test(txt(t));
+    const opsDePago = new Set();
+    for (const m of movs) if (ES_PAGO(m.tipo) && m.op) opsDePago.add(m.op);
+    const impuestoDePago = new Map();
+    for (const m of movs) {
+      if (!m.op || !opsDePago.has(m.op)) continue;
+      const c = clasificaMovimiento(m.tipo);
+      if (c.grupo !== 'agregado') continue;
+      impuestoDePago.set(m.op, r2((impuestoDePago.get(m.op) || 0) + m.importe));
+    }
+    // Una misma operación puede traer varias líneas que empiezan con "Pago"
+    // (por ejemplo "Pago con descuento recibido"). El impuesto se suma a una sola:
+    // la que dice "Pago" a secas y, si no está, la de mayor importe.
+    const pagoPrincipal = new Map();
+    for (const m of movs) {
+      if (!m.op || !ES_PAGO(m.tipo)) continue;
+      const actual = pagoPrincipal.get(m.op);
+      if (!actual) { pagoPrincipal.set(m.op, m); continue; }
+      const exacto = t => /^pago$/i.test(txt(t));
+      if (exacto(m.tipo) && !exacto(actual.tipo)) pagoPrincipal.set(m.op, m);
+      else if (exacto(m.tipo) === exacto(actual.tipo) && Math.abs(m.importe) > Math.abs(actual.importe))
+        pagoPrincipal.set(m.op, m);
+    }
     const opsEmitidas = new Set();
     const opsAnuladas = new Set();
     for (const [op, neto] of netoPorOp) {
@@ -744,6 +772,8 @@
       const c = clasificaMovimiento(m.tipo);
 
       if (c.grupo === 'agregado') {
+        // Si el impuesto es de un pago, no va al pie: se lo sumo al pago.
+        if (m.op && opsDePago.has(m.op)) continue;
         // Impuestos, retenciones y costo de Mercado Pago quedan SIEMPRE en este
         // extracto, también los de Tu delivery y deuda por comisiones. Al extracto
         // de la tienda online se va únicamente el total de lo que pagó el cliente.
@@ -773,21 +803,25 @@
       if (c.grupo === 'desconocido') {
         // tipos que no tengo mapeados (percepciones, compras, etc.): van igual al
         // extracto con la descripción que trae MP, para no perderlos
-        desconocidos.set(m.tipo, r2((desconocidos.get(m.tipo) || 0) + m.importe));
-        const esPago = /^pag/i.test(m.tipo);
+        const esPago = ES_PAGO(m.tipo);
+        // el impuesto de este pago se suma acá, no al pie
+        const impPago = (esPago && m.op && pagoPrincipal.get(m.op) === m) ? (impuestoDePago.get(m.op) || 0) : 0;
+        const importeConImp = r2(m.importe + impPago);
+        desconocidos.set(m.tipo, r2((desconocidos.get(m.tipo) || 0) + importeConImp));
         const tOtro = txPorOp.get(m.op);
         const detOtro = tOtro ? detalleDe(tOtro) : '';
         // si la transacción trae el detalle, lo usamos; si no, queda vacío para
         // que se identifique a mano en Mercado Pago
         const descOtro = esPago ? (detOtro ? `Compra - ${detOtro}` : '') : m.tipo;
+        const colaImp = impPago ? ` Le sumé ${Math.abs(impPago).toLocaleString('es-AR')} de impuestos de esa misma operación, así queda por el total de la factura.` : '';
         aviso('movimiento', esPago
           ? (detOtro
-              ? `Pago de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo puse como "${descOtro}" con el detalle de la transacción.`
-              : `Pago de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo dejé sin descripción para que lo identifiques en Mercado Pago.`)
+              ? `Pago de ${importeConImp.toLocaleString('es-AR')} el ${m.fecha}: lo puse como "${descOtro}" con el detalle de la transacción.${colaImp}`
+              : `Pago de ${importeConImp.toLocaleString('es-AR')} el ${m.fecha}: lo dejé sin descripción para que lo identifiques en Mercado Pago.${colaImp}`)
           : `Movimiento "${m.tipo}" de ${m.importe.toLocaleString('es-AR')} el ${m.fecha}: lo dejé en el extracto con esa descripción. Cambiala si corresponde.`, m.op);
         extracto.push({
           ts: m.ts, fecha: m.fecha, tipo: '', descripcion: descOtro, contacto: '', op: m.op,
-          importe: m.importe,
+          importe: importeConImp,
           metadata: tOtro ? txt(tOtro[cTx.extra]) : '',
           cuenta: tOtro ? identDe(tOtro) : '',
           dash: '', factura: '',
