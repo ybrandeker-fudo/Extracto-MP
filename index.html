@@ -684,6 +684,23 @@
     const cobroPorOp = new Set();
     for (const m of movs) if (/^Cobro$/i.test(m.tipo) && m.op) cobroPorOp.add(m.op);
 
+    // --- "Movimiento General" = la anulación de la retención de IIBB por falta de alta ---
+    // Mercado Pago le pone nombre a todas las anulaciones menos a esa: la manda así,
+    // sin descripción. Se reconoce porque la operación tiene devolución o anulaciones,
+    // y el importe coincide al centavo con la retención que quedó sin anular. Va a la
+    // misma línea del pie que esas retenciones, no como fila suelta del extracto.
+    const ES_MOV_GENERAL = t => /^Movimiento General$/i.test(txt(t));
+    const anulaIIBB = new Set();
+    (function(){
+      const revertidas = new Set();
+      for (const m of movs) {
+        if (m.op && /Devoluci[óo]n|Anulaci[óo]n/i.test(txt(m.tipo))) revertidas.add(m.op);
+      }
+      for (const m of movs) {
+        if (ES_MOV_GENERAL(m.tipo) && m.op && revertidas.has(m.op)) anulaIIBB.add(m);
+      }
+    })();
+
     // --- los impuestos de un pago no se separan al pie: van con el pago ---
     // La factura del proveedor se carga por el total de la operación, así que el
     // impuesto a los créditos y débitos (o lo que venga) tiene que quedar sumado
@@ -833,6 +850,11 @@
       if (ES_DESC_CONTRAPARTE(m.tipo) && m.op && conDetalle.has(m.op)) continue;
       // dos movimientos del mismo ID que se cancelan: no van ninguno de los dos
       if (seCancelan.has(m)) continue;
+      // la anulación de la retención de IIBB netea en la línea de esas retenciones
+      if (anulaIIBB.has(m)) {
+        totalesAgregados.set('iibb_otras', r2((totalesAgregados.get('iibb_otras') || 0) + m.importe));
+        continue;
+      }
       if (c.grupo === 'desconocido') {
         // tipos que no tengo mapeados (percepciones, compras, etc.): van igual al
         // extracto con la descripción que trae MP, para no perderlos
