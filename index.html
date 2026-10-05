@@ -184,7 +184,7 @@
       <div><label class="fld">Desde</label><input type="date" id="desde"></div>
       <div><label class="fld">Hasta</label><input type="date" id="hasta"></div>
       <div><label class="fld">Línea de comisión</label><input type="text" id="etiquetaCom" placeholder="Com Septiembre 2026" size="18"></div>
-      <div><label class="fld">Precio terminal</label><input type="text" id="precioTerminal" value="79900" size="8"></div>
+      <div><label class="fld">Precios de terminal</label><input type="text" id="precioTerminal" value="95000, 79900" size="16" title="Separados por coma. Se prueban en orden y gana el que da el importe cobrado."></div>
 
       <button id="btn" disabled>Procesar</button>
       <button class="sec" id="btnLimpiar">Limpiar</button>
@@ -349,7 +349,11 @@
     <details>
       <summary>El cuadro de terminales</summary>
       <div class="rc">
-        <p>Los tres tramos del identificador TFP son pares de <b>cantidad y descuento</b>, y el precio de lista es 79.900.
+        <p>Los tres tramos del identificador TFP son pares de <b>cantidad y descuento</b>. Los precios de lista
+           conviven: cuando cambia la lista, durante un tiempo entran ventas al precio viejo y al nuevo, así que
+           el campo <b>Precios de terminal</b> acepta varios separados por coma. Cada venta se calcula con todos
+           y se queda con el que da justo lo cobrado; el que usó queda escrito en la columna <b>PRECIO</b>. El
+           aviso salta sólo cuando no cierra con ninguno.
            Con <code>TFP:123456:1;75:4;50:10;0:16:Nombre del local</code>: 1 al 75 % son 19.975, 4 al 50 % son 159.800 y 10 sin
            descuento son 799.000 — total 978.775, que es lo cobrado.</p>
         <table class="rt">
@@ -503,8 +507,12 @@
     { clave: 'comision', etiqueta: null, // 'Com <Mes> <Año>'
       test: t => /Costo de Mercado Pago/i.test(t) }
   ];
-  // precio de lista de la terminal SmartPos; los tramos del identificador traen el descuento
-  const PRECIO_TERMINAL = 79900;
+  // precios de lista de la terminal SmartPos; los tramos del identificador traen
+  // el descuento. Conviven varios: cuando cambia la lista, durante un tiempo
+  // entran ventas al precio viejo y al nuevo. Se prueban en orden y gana el que
+  // da el importe cobrado.
+  const PRECIOS_TERMINAL = [95000, 79900];
+  const PRECIO_TERMINAL = PRECIOS_TERMINAL[0];
 
   const ES_PLATAFORMA = t => /Comisi[óo]n por uso de plataforma de terceros/i.test(t);
   const ES_RENDIMIENTO = t => /Rendimiento (positivo|negativo) de la inversi[óo]n/i.test(t);
@@ -960,15 +968,18 @@
 
       if (/^Venta SmartPos/.test(descripcion)) {
         const det = detalleTerminales([base.colJ, base.colK, base.colL], importeNeto,
-                                      opts.precioTerminal != null ? opts.precioTerminal : PRECIO_TERMINAL);
+                                      opts.precioTerminal != null ? opts.precioTerminal : PRECIOS_TERMINAL);
         base.lineas = det.lineas; base.descuento = det.descuento;
         base.qTerminales = det.cantidad; base.teorico = det.teorico;
+        base.precioTerminal = importeNeto > 0 ? det.precio : '';
         // en una devolución el importe viene en negativo: el control no aplica
         base.control = importeNeto > 0 ? det.control : '';
         if (det.control !== '' && Math.abs(det.control) > 0.5 && importeNeto > 0) {
           // el nombre de la cuenta todavía no está resuelto acá: lo busco igual que abajo
           const nombreAviso = cuentas.porId.get(res.dash) || res.nombreIdent || `ID de Dash ${res.dash || '(sin ID)'}`;
-          aviso('terminal', `La venta SmartPos de "${nombreAviso}" debería dar ${det.teorico.toLocaleString('es-AR')} según los descuentos (${det.descuento}) y cobró ${importeNeto.toLocaleString('es-AR')}.`, m.op);
+          const lista = (Array.isArray(opts.precioTerminal) ? opts.precioTerminal : PRECIOS_TERMINAL)
+            .map(x => Number(x).toLocaleString('es-AR')).join(' ni a ');
+          aviso('terminal', `La venta SmartPos de "${nombreAviso}" cobró ${importeNeto.toLocaleString('es-AR')} y con los descuentos (${det.descuento}) no cierra ni a ${lista}. Al precio de ${Number(det.precio).toLocaleString('es-AR')} debería dar ${det.teorico.toLocaleString('es-AR')}.`, m.op);
         }
       }
 
@@ -1117,10 +1128,15 @@
 
   // Detalle de una venta de terminales a partir de los tramos "cantidad;descuento"
   // del identificador TFP. Ej: 1;75 + 1;50 + 1;50 -> 3 terminales, 2 líneas, "75 y 50".
+  // Acepta un precio o una lista. Calcula el teórico con cada uno y se queda con
+  // el que da justo el importe cobrado; si ninguno cierra, usa el primero y el
+  // control queda distinto de cero para que salte el aviso.
   function detalleTerminales(tramos, importe, precioLista) {
-    const precio = Number(precioLista) || 0;
-    let cantidad = 0, teorico = 0;
-    const descuentos = [];
+    const precios = (Array.isArray(precioLista) ? precioLista : [precioLista])
+      .map(x => Number(x) || 0).filter(x => x > 0);
+    if (!precios.length) precios.push(0);
+    let cantidad = 0;
+    const descuentos = [], pesos = [];
     for (const t of tramos) {
       const p = txt(t).split(';');
       if (p.length < 2) continue;
@@ -1128,20 +1144,28 @@
       const d = parseFloat(String(p[1]).replace(',', '.'));
       if (!q || isNaN(q) || isNaN(d)) continue;
       cantidad += q;
-      teorico += q * precio * (1 - d / 100);
+      pesos.push(q * (1 - d / 100));
       if (!descuentos.includes(d)) descuentos.push(d);
+    }
+    const factor = pesos.reduce((a, b) => a + b, 0);
+    const cobrado = num(importe);
+    let precio = precios[0], teorico = r2(factor * precio);
+    for (const px of precios) {
+      const t = r2(factor * px);
+      if (Math.abs(t - cobrado) <= 0.5) { precio = px; teorico = t; break; }
     }
     return {
       lineas: descuentos.length || '',
       descuento: descuentos.length === 1 ? descuentos[0] : descuentos.join(' Y '),
       cantidad: cantidad || '',
-      teorico: r2(teorico),
-      control: precio ? r2(teorico - num(importe)) : ''
+      precio: precio || '',
+      teorico: teorico,
+      control: precio ? r2(teorico - cobrado) : ''
     };
   }
 
   const API = { procesar, clasificaTx, clasificaMovimiento, fechaDe, norm, limpiaComillas, num, r2,
-                MESES, detalleTerminales, etiquetaComisionPorDefecto, PRECIO_TERMINAL };
+                MESES, detalleTerminales, etiquetaComisionPorDefecto, PRECIO_TERMINAL, PRECIOS_TERMINAL };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.MPCore = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -1336,7 +1360,9 @@ function procesar(){
         alias: alias(),
         desde: $('#desde').value || null, hasta: $('#hasta').value || null,
         etiquetaComision: $('#etiquetaCom').value.trim() || null,
-        precioTerminal: parseFloat($('#precioTerminal').value) || 0
+        precioTerminal: String($('#precioTerminal').value).split(/[,;\s]+/)
+                          .map(x => parseFloat(x.replace(/\./g, '').replace(',', '.')))
+                          .filter(x => x > 0)
       });
       aplicarDescripciones();
       pintar();
@@ -1582,14 +1608,15 @@ const COLS_HARDWARE = COLS_BASE;
 const COLS_TERMINALES = CON_CUENTA
   .concat([['rz','RZ'],['condicion','Condición'],
            ['lineas','LINEA'],['descuento','DESCUENTO'],['qTerminales','Q TERMINALES'],
-           ['control','CONTROL'],['contacto','ID ODOO'],['condicion','COND IMP']]);
+           ['precioTerminal','PRECIO'],['control','CONTROL'],['contacto','ID ODOO'],
+           ['condicion','COND IMP']]);
 const COLS_BUCKET = [
   ['fecha','Fecha de Pago'],['tipo','Tipo de Operación'],['descripcion','Descripción'],
   ['op','Operación Relacionada'],['importe','Importe'],['dash','ID de Dash'],
   ['ident','Identificación MP'],['refMP','Detalle de la venta'],['medio','Medio de pago'],
   ['comisionMP','Comisiones + IVA'],['neto','Neto']
 ];
-const NUMERICAS = ['importe','comisionMP','neto','control','qTerminales','lineas','contacto','dash'];
+const NUMERICAS = ['importe','comisionMP','neto','control','qTerminales','lineas','contacto','dash','precioTerminal'];
 const NARANJA = 'FF5023';   // el cuadro de terminales va en el naranja de Fudo
 
 function aHoja(filas, cols, opciones){
