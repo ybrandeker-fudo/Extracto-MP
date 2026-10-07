@@ -183,7 +183,7 @@
     <div class="row" style="margin-top:16px">
       <div><label class="fld">Desde</label><input type="date" id="desde"></div>
       <div><label class="fld">Hasta</label><input type="date" id="hasta"></div>
-      <div><label class="fld">Línea de comisión</label><input type="text" id="etiquetaCom" placeholder="Com Septiembre 2026" size="18"></div>
+      <div><label class="fld">Línea de comisión</label><input type="text" id="etiquetaCom" placeholder="sale del período" size="18" title="Se completa sola con el mes de cierre del período. Sólo escribí acá si querés otra etiqueta."></div>
       <div><label class="fld">Precios de terminal</label><input type="text" id="precioTerminal" value="95000, 79900" size="16" title="Separados por coma. Se prueban en orden y gana el que da el importe cobrado."></div>
 
       <button id="btn" disabled>Procesar</button>
@@ -504,8 +504,11 @@
       test: t => /Ingresos Brutos por falta de alta|Impuesto a los IIBB de/i.test(t) },
     { clave: 'iibb_caba', etiqueta: 'Ret. IIBB CABA',
       test: t => /ingresos brutos de CABA/i.test(t) },
+    // El costo por intereses absorbidos es el financiamiento en cuotas que
+    // absorbe el vendedor: va junto al cargo de Mercado Pago, en la misma línea
+    // de comisión del mes.
     { clave: 'comision', etiqueta: null, // 'Com <Mes> <Año>'
-      test: t => /Costo de Mercado Pago/i.test(t) }
+      test: t => /Costo de Mercado Pago|Costo por intereses absorbidos/i.test(t) }
   ];
   // precios de lista de la terminal SmartPos; los tramos del identificador traen
   // el descuento. Conviven varios: cuando cambia la lista, durante un tiempo
@@ -1315,7 +1318,16 @@ function sugerirFechas(){
   if (!f.length) return;
   $('#desde').value = f[0];
   $('#hasta').value = f[f.length-1];
-  $('#etiquetaCom').placeholder = MPCore.etiquetaComisionPorDefecto(f[f.length-1]);
+  ponerEtiquetaCom();
+}
+// La etiqueta de la comisión sale sola del período: 'Com <Mes> <Año>' del día de
+// cierre. Se vuelve a escribir cada vez que cambia el "Hasta", salvo que haya una
+// etiqueta escrita a mano que no tenga la forma automática.
+function ponerEtiquetaCom(){
+  const inp = $('#etiquetaCom');
+  const auto = MPCore.etiquetaComisionPorDefecto($('#hasta').value || null);
+  const v = inp.value.trim();
+  if (!v || /^Com\s+\S+\s+\d{4}$/i.test(v)) inp.value = auto;
 }
 function revisarListo(){
   $('#btn').disabled = !(datos.mov && datos.tx) || cargando > 0;
@@ -1348,6 +1360,7 @@ $('#btnAplicar').addEventListener('click', () => {
   procesar();
 });
 $('#btnLimpiar').addEventListener('click', () => location.reload());
+$('#hasta').addEventListener('change', ponerEtiquetaCom);
 
 function procesar(){
   if (!datos.mov || !datos.tx) return;
