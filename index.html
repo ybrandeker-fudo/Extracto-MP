@@ -232,6 +232,9 @@
   <!-- ============ 4. AVISOS ============ -->
   <div class="card hidden" id="cAvisos">
     <h2>Avisos</h2>
+    <p class="muted" style="margin:0 0 12px">Los rojos son los que frenan la facturación. Entre ellos,
+       <b>Falta el contacto en Odoo</b> sale una vez por cuenta —no por cobro— con el nombre de la cuenta
+       tal como figura en Dash, para que puedas darla de alta en Odoo y volver a correr con el contacto nuevo.</p>
     <div id="avisos"></div>
   </div>
 
@@ -495,6 +498,8 @@
   };
 
   // ---------- diccionario de tipos de movimiento ----------
+  // contacto de Odoo al que se imputa la línea de comisión de Mercado Pago
+  const CONTACTO_COMISION = 169927;
   const AGREGADOS = [
     { clave: 'sirtac',   etiqueta: 'Ret. SIRTAC',
       test: t => /R[ée]gimen SIRTAC/i.test(t) },
@@ -507,7 +512,7 @@
     // El costo por intereses absorbidos es el financiamiento en cuotas que
     // absorbe el vendedor: va junto al cargo de Mercado Pago, en la misma línea
     // de comisión del mes.
-    { clave: 'comision', etiqueta: null, // 'Com <Mes> <Año>'
+    { clave: 'comision', etiqueta: null, // 'Com <Mes> <Año>' — contacto fijo CONTACTO_COMISION
       test: t => /Costo de Mercado Pago|Costo por intereses absorbidos/i.test(t) }
   ];
   // precios de lista de la terminal SmartPos; los tramos del identificador traen
@@ -614,6 +619,10 @@
 
     const avisos = [];
     const aviso = (tipo, msg, ref) => avisos.push({ tipo, msg, ref: ref || '' });
+    // Cuentas que están en Dash pero no tienen contacto en Odoo. Se juntan por ID
+    // de cuenta (no por cobro) para que la lista sea la de las altas que hay que
+    // hacer en Odoo, con el nombre de la cuenta de Dash para poder cargarlas.
+    const sinOdoo = new Map();
     if (odoo.sinCondicion)
       aviso('archivo', 'El export de Odoo no trae la columna de condición frente al impuesto, así que ' +
         'COND IMP y Condición van a quedar vacías. Agregala al export: "Tipo de responsabilidad de ARCA".');
@@ -814,11 +823,18 @@
       return r;
     }
 
-    function datosOdoo(dash, op, desc) {
+    function datosOdoo(dash, op, desc, importe) {
       if (!dash) return { contacto: '', rz: '', condicion: '', nif: '' };
       const regs = odoo.get(dash);
       if (!regs || !regs.length) {
-        aviso('sin_odoo', `Sin contacto de Odoo para el ID de Dash ${dash}${desc ? ' (' + desc + ')' : ''}.`, op);
+        // el nombre sale del reporte de cuentas de Dash, que es justo lo que hace
+        // falta para dar de alta el contacto en Odoo
+        const reg = sinOdoo.get(dash) ||
+          { dash: dash, nombre: cuentas.porId.get(dash) || '', cobros: 0, importe: 0, desc: desc || '' };
+        reg.cobros += 1;
+        reg.importe = r2(reg.importe + (Number(importe) || 0));
+        if (!reg.nombre) reg.nombre = cuentas.porId.get(dash) || '';
+        sinOdoo.set(dash, reg);
         return { contacto: '', rz: '', condicion: '', nif: '' };
       }
       if (regs.length > 1) {
@@ -989,7 +1005,7 @@
         }
       }
 
-      const od = datosOdoo(res.dash, m.op, descripcion);
+      const od = datosOdoo(res.dash, m.op, descripcion, m.importe);
 
       // La descripción es siempre el nombre de la cuenta, que sale del reporte
       // accounts por ID de Dash. Si la cuenta no está ahí, cae a la razón social
@@ -1042,7 +1058,9 @@
         etiqueta = txt(opts.etiquetaComision) || etiquetaComisionPorDefecto(fHasta);
       }
       pie.push({
-        ts: fHasta + 'T23:59:59Z', fecha: fHasta, tipo: '', descripcion: etiqueta, contacto: '',
+        ts: fHasta + 'T23:59:59Z', fecha: fHasta, tipo: '', descripcion: etiqueta,
+        // la comisión se imputa siempre al mismo contacto de Odoo
+        contacto: a.clave === 'comision' ? CONTACTO_COMISION : '',
         op: '', importe: totalesAgregados.get(a.clave), metadata: '', cuenta: '', dash: '',
         factura: '', colJ: '', colK: '', colL: '', colM: '',
         refMP: '', rz: '', condicion: '', nif: '', categoria: 'agregado'
@@ -1064,6 +1082,18 @@
     const sinId = filas.filter(f => f.tipo === 'Cobro' && !txt(f.dash) && f.categoria !== 'hardware');
     if (sinId.length) {
       aviso('sin_id', `${sinId.length} ${sinId.length === 1 ? 'cobro quedó' : 'cobros quedaron'} sin ID de Dash, así que ${sinId.length === 1 ? 'su descripción y su contacto de Odoo están' : 'sus descripciones y contactos de Odoo están'} incompletos. Cargá el ID en el panel de pendientes.`);
+    }
+
+    // --- cuentas de Dash que todavía no tienen contacto en Odoo ---
+    // Una línea por cuenta con el nombre de Dash, para darlas de alta en Odoo y
+    // volver a correr con el contacto nuevo.
+    const faltanOdoo = [...sinOdoo.values()].sort((a, b) => b.importe - a.importe);
+    for (const f of faltanOdoo) {
+      aviso('sin_odoo', 'Falta el contacto en Odoo · ID de cuenta de Dash ' + f.dash + ' · ' +
+        (f.nombre || (f.desc ? f.desc + ' (el nombre no está en el reporte de cuentas)'
+                            : 'sin nombre: la cuenta tampoco está en el reporte de cuentas')) +
+        ' · ' + f.cobros + (f.cobros === 1 ? ' cobro' : ' cobros') +
+        ' · $' + f.importe.toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 }));
     }
 
     // --- ¿el reporte de transacciones cubre el período? ---
@@ -1652,6 +1682,12 @@ function aHoja(filas, cols, opciones){
       const n = Number(v);
       return isNaN(n) ? v : n;
     }
+    // la referencia de pago baja siempre como texto, con el apóstrofo adelante,
+    // para que Excel no la convierta en 1,8E+11 ni le coma dígitos
+    if (k === 'op') {
+      const t = String(v ?? '').trim();
+      return t === '' ? '' : (t.charAt(0) === "'" ? t : "'" + t);
+    }
     return v ?? '';
   })));
   // Los totales se muestran en el procesador, no en el Excel: las hojas bajan sólo
@@ -1671,7 +1707,9 @@ function aHoja(filas, cols, opciones){
         return;
       }
       if (k === 'fecha') celda.z = 'dd/mm/yyyy';
-      else if (k === 'importe' || k === 'comisionMP' || k === 'neto' || k === 'control') celda.z = '#,##0.00';
+      // sin separador de miles: el formato 0.00 deja el número con dos decimales y
+      // Excel muestra la coma según tu configuración regional (-50000,30)
+      else if (k === 'importe' || k === 'comisionMP' || k === 'neto' || k === 'control') celda.z = '0.00';
     });
   }
   ws['!cols'] = cols.map(([k]) => ({ wch:
